@@ -1,1 +1,17 @@
 /elasticsearch/target/
+/core/target/
+/cassandra/target/
+/hbase/target/
+/hypertable/target/
+/dynamodb/target/
+/infinispan/target/
+/jdbc/target/
+/mapkeeper/target/
+/mongodb/target/
+/orientdb/target/
+/redis/target/
+/voldemort/target/
+/distribution/target/
+.DS_Store
+
+core/nbactions.xml
