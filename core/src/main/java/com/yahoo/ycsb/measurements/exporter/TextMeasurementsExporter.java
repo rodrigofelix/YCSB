@@ -45,6 +45,12 @@ public class TextMeasurementsExporter implements MeasurementsExporter
     bw.write("[" + metric + "], " + measurement + ", " + d);
     bw.newLine();
   }
+  
+  public void write(String metric, String measurement, String s) throws IOException
+  {
+    bw.write("[" + metric + "], " + measurement + ", " + s);
+    bw.newLine();
+  }
 
   public void close() throws IOException
   {

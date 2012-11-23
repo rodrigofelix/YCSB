@@ -68,4 +68,9 @@ public class JSONMeasurementsExporter implements MeasurementsExporter
     }
   }
 
+    @Override
+    public void write(String metric, String measurement, String s) throws IOException {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
 }

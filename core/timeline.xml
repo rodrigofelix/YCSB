@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- defines the way the number of clients should vary -->
+<!-- types: linear, poisson, sinoidal -->
+<distribution type="linear">
+    <!-- explicitly states the number of clients in each time (in seconds) -->
+    <timeline>
+        <entry time="5">10</entry>
+        <entry time="10">400</entry>
+        <entry time="20">50</entry>
+        <entry time="30">40</entry>
+        <entry time="40">200</entry>
+        <entry time="50">10</entry>
+    </timeline>
+</distribution>
