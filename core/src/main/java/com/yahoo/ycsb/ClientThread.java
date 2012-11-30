@@ -24,6 +24,7 @@ public class ClientThread extends Thread {
     int _threadcount;
     Object _workloadstate;
     Properties _props;
+    private boolean _stopRequested = false;
 
     /**
      * Constructor.
@@ -38,7 +39,6 @@ public class ClientThread extends Thread {
      * @param targetperthreadperms target number of operations per thread per ms
      */
     public ClientThread(DB db, boolean dotransactions, Workload workload, int threadid, int threadcount, Properties props, int opcount, double targetperthreadperms) {
-        //TODO: consider removing threadcount and threadid
         _db = db;
         _dotransactions = dotransactions;
         _workload = workload;
@@ -54,7 +54,16 @@ public class ClientThread extends Thread {
     public int getOpsDone() {
         return _opsdone;
     }
+    
+    public void setStopRequested(boolean stopRequested){
+        this._stopRequested = stopRequested;
+    }
+    
+    public boolean isStopRequested(){
+        return this._stopRequested;
+    }
 
+    @Override
     public void run() {
         try {
             _db.init();
@@ -91,8 +100,7 @@ public class ClientThread extends Thread {
             // this is make in order to keep the number of clients according to 
             // the distribution defined in the timeline        
 
-            // TODO: port method implemented in method run of Client.java
-            while (true) {
+            while (!this.isStopRequested()) {
                 long st = System.currentTimeMillis();
                 if (_dotransactions) {
                     _workload.doTransaction(_db, _workloadstate);

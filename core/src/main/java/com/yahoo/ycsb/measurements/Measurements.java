@@ -15,12 +15,12 @@
  */
 package com.yahoo.ycsb.measurements;
 
+import br.ufc.lsbd.benchxtend.configuration.Distribution;
+import br.ufc.lsbd.benchxtend.configuration.Sla;
+import com.yahoo.ycsb.measurements.exporter.MeasurementsExporter;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Properties;
-
-import com.yahoo.ycsb.measurements.exporter.MeasurementsExporter;
-import java.util.ArrayList;
 
 /**
  * Collects latency measurements, and reports them when requested.
@@ -34,9 +34,25 @@ public class Measurements {
     private static final String MEASUREMENT_TYPE_DEFAULT = "histogram";
     static Measurements singleton = null;
     static Properties measurementproperties = null;
+    static long startTime = -1;
+    static Sla sla;
+    static Distribution distribution;
+    HashMap<String, OneMeasurement> data;
 
     public static void setProperties(Properties props) {
         measurementproperties = props;
+    }
+    
+    public static void setSla(Sla _sla){
+        sla = _sla;
+    }
+    
+    public static void setDistribution(Distribution _distribution){
+        distribution = _distribution;
+    }
+    
+    public static void setStartTime(long _startTime){
+        startTime = _startTime;
     }
 
     /**
@@ -48,15 +64,15 @@ public class Measurements {
         }
         return singleton;
     }
-    HashMap<String, OneMeasurement> data;
+    
     boolean histogram = true;
     boolean individual = false;
     private Properties _props;
-
+    
     /**
      * Create a new object with the specified properties.
      */
-    public Measurements(Properties props) {
+    private Measurements(Properties props) {
         data = new HashMap<String, OneMeasurement>();
 
         _props = props;
@@ -71,10 +87,23 @@ public class Measurements {
             }
         }
     }
+    
+    private Measurements(Properties props, Sla _sla, Distribution _distribution, long _startTime){
+        this(props);
+        startTime = _startTime;
+        distribution = _distribution;
+        sla = _sla;
+    }
 
     OneMeasurement constructOneMeasurement(String name) {
         if (individual) {
-            return new OneMeasurementIndividual(name, _props);
+            if(sla == null || distribution == null || startTime == -1){
+                System.out.println("ERROR: SLA, Distribution or StartTime was not set to use Individual "
+                        + "measurement. Histogram measurement will be used instead.");
+                return new OneMeasurementHistogram(name, _props);
+            }else{
+                return new OneMeasurementIndividual(name, _props, sla, distribution, startTime);
+            }
         } else {
             if (histogram) {
                 return new OneMeasurementHistogram(name, _props);
@@ -107,7 +136,7 @@ public class Measurements {
     }
 
     /**
-     * Report a return code for a single DB operaiton.
+     * Report a return code for a single DB operation.
      */
     public void reportReturnCode(String operation, int code) {
         if (!data.containsKey(operation)) {

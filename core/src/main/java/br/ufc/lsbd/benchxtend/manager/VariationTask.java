@@ -5,6 +5,7 @@
 package br.ufc.lsbd.benchxtend.manager;
 
 //import br.ufc.lsbd.benchxtend.log.ExecutionLog;
+import br.ufc.lsbd.benchxtend.ExecutionLog;
 import com.yahoo.ycsb.Client;
 import java.io.IOException;
 import java.util.TimerTask;
@@ -54,20 +55,17 @@ public class VariationTask extends TimerTask {
             // stops the timer
             manager.timer.cancel();
             
-            // starts the process to persists the execution log
-            // TODO: define a way to persist the logs calling the exportMeasurements here
-            // See end of Client.java source file 
-            
+            // starts the process of persisting the execution log
             try {
                 Client.exportMeasurements(manager.workload.properties, 0, endTime - manager.workload.startTime);
             } catch (IOException e) {
                 System.err.println("Could not export measurements, error: " + e.getMessage());
-                e.printStackTrace();
                 System.exit(-1);
             }
             
             // ExecutionLog.persist(manager.workload.measurements, ExecutionLog.EXECUTION);
-            // ExecutionLog.persist(manager.timelineHistory, ExecutionLog.TIMELINE);
+            // TODO: find a way to save this log using a measurement exporter
+            ExecutionLog.persist(manager.timelineHistory, ExecutionLog.TIMELINE);
         }
     }
 }

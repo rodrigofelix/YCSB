@@ -4,7 +4,7 @@
  */
 package br.ufc.lsbd.benchxtend.manager;
 
-import br.ufc.lsbd.benchxtend.Entry;
+import br.ufc.lsbd.benchxtend.configuration.Entry;
 import cern.jet.random.Poisson;
 import cern.jet.random.engine.DRand;
 import cern.jet.random.engine.RandomEngine;

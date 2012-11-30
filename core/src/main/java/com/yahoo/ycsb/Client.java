@@ -15,7 +15,7 @@
  */
 package com.yahoo.ycsb;
 
-import br.ufc.lsbd.benchxtend.Distribution;
+import br.ufc.lsbd.benchxtend.configuration.*;
 import br.ufc.lsbd.benchxtend.manager.ClientManager;
 import com.thoughtworks.xstream.XStream;
 import com.thoughtworks.xstream.io.xml.DomDriver;
@@ -54,6 +54,7 @@ public class Client {
                 + "              \"threadcount\" property using -p");
         System.out.println("  -timeline xmlfile:  load the timeline process and its properties. If passed, timeline \n"
                 + "              will overwrite -threads, since threads will be defined according to the timeline");
+        System.out.println("  -sla xmlfile:  load the file with expected query times defined in the SLA");
         System.out.println("  -target n: attempt to do n operations per second (default: unlimited) - can also\n"
                 + "              be specified as the \"target\" property using -p");
         System.out.println("  -load:  run the loading phase of the workload");
@@ -134,6 +135,7 @@ public class Client {
         Properties props = new Properties();
         Properties fileprops = new Properties();
         Distribution distribution = null;
+        Sla sla = null;
         boolean dotransactions = true;
         int threadcount = 1;
         int target = 0;
@@ -169,14 +171,41 @@ public class Client {
 
                 // loads the xmlFile and sets the suitable objects of Timeline
                 try {
+                    // creates object to read configuration xml file
                     XStream xstream = new XStream(new DomDriver());
                     xstream.processAnnotations(Distribution.class);
 
                     // read from XML
                     distribution = (Distribution) xstream.fromXML(new FileInputStream(new File(args[argindex])));
-                    // TODO: find a way to propagate distribution object via props, if necessary
+
                     // sets distribution to true to identify that a timeline was provided
                     props.setProperty("distribution", "true");
+                    argindex++;
+                } catch (Exception ex) {
+                    System.out.println("Error when loading timeline file: " + ex.toString());
+                    // finishes execution
+                    System.exit(0);
+                }
+            } else if (args[argindex].compareTo("-sla") == 0) {
+                argindex++;
+                // check if it was provided a next argument that is supposed
+                // to be the xmlFile that defines the SLA
+                if (argindex >= args.length) {
+                    usageMessage();
+                    System.exit(0);
+                }
+
+                // loads the xmlFile and sets the suitable object of SLA
+                try {
+                    // creates object to read configuration xml file
+                    XStream xstream = new XStream(new DomDriver());
+                    xstream.processAnnotations(Sla.class);
+
+                    // read from XML
+                    sla = (Sla) xstream.fromXML(new FileInputStream(new File(args[argindex])));
+
+                    // sets distribution to true to identify that an SLA was provided
+                    props.setProperty("sla", "true");
                     argindex++;
                 } catch (Exception ex) {
                     System.out.println("Error when loading timeline file: " + ex.toString());
@@ -294,11 +323,8 @@ public class Client {
 
         long maxExecutionTime = Integer.parseInt(props.getProperty(MAX_EXECUTION_TIME, "0"));
 
-        // TODO: overwrite the thread count since this will be defined
-        // dinamically according to the timeline. Improvement: If no 
-        // timeline is passed this feature must continue working
-
-        //get number of threads, target and db
+        // get number of threads, target and db
+        // threadcount will not be used if a distribution is provided
         threadcount = Integer.parseInt(props.getProperty("threadcount", "1"));
         dbname = props.getProperty("db", "com.yahoo.ycsb.BasicDB");
         target = Integer.parseInt(props.getProperty("target", "0"));
@@ -337,10 +363,10 @@ public class Client {
 
         warningthread.start();
 
-        // TODO: change measurements to save spent time by query
-
         //set up measurements
         Measurements.setProperties(props);
+        Measurements.setSla(sla);
+        Measurements.setDistribution(distribution);
 
         //load the workload
         ClassLoader classLoader = Client.class.getClassLoader();
@@ -386,10 +412,8 @@ public class Client {
 
         // 1st case: Follows BenchXtend approach varying the number of clients
         if (distribution != null) {
-            ArrayList<Thread> threads = new ArrayList<Thread>();
-
-            // instantiate manager to create (and remove) ClientThreads
-            ClientManager manager = new ClientManager(distribution, workload);
+            // instantiates manager to create (and remove) ClientThreads
+            ClientManager manager = new ClientManager(distribution, sla, workload);
             manager.init();
         } else {
             // 2nd case: Follows the basic flow of YCSB
@@ -425,7 +449,6 @@ public class Client {
 
             long st = System.currentTimeMillis();
 
-            // TODO: threads must be initialized (and stopped) by ClientManager
             for (Thread t : threads) {
                 t.start();
             }
@@ -458,7 +481,6 @@ public class Client {
                 statusthread.interrupt();
             }
 
-            // TODO: treat the follow code below to finish the application
             try {
                 workload.cleanup();
             } catch (WorkloadException e) {

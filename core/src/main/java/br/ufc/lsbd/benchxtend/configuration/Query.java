@@ -6,16 +6,18 @@ package br.ufc.lsbd.benchxtend.configuration;
 
 import com.thoughtworks.xstream.annotations.XStreamAlias;
 import com.thoughtworks.xstream.annotations.XStreamAsAttribute;
-import java.util.ArrayList;
 
 /**
  *
  * @author rodrigofelix
  */
-@XStreamAlias("distribution")
-public class Distribution {
+@XStreamAlias("query")
+public class Query {
+    
     @XStreamAsAttribute
     public String type;
-    public ArrayList<Entry> timeline;
-    public Elasticity elasticity;
+    
+    @XStreamAsAttribute
+    public int time;
+    
 }

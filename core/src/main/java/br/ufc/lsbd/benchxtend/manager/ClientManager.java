@@ -4,14 +4,14 @@
  */
 package br.ufc.lsbd.benchxtend.manager;
 
-import br.ufc.lsbd.benchxtend.Distribution;
-import br.ufc.lsbd.benchxtend.Entry;
-//import br.ufc.lsbd.benchxtend.measurements.LogEntry;
+import br.ufc.lsbd.benchxtend.LogEntry;
+import br.ufc.lsbd.benchxtend.configuration.*;
 import com.yahoo.ycsb.ClientThread;
 import com.yahoo.ycsb.DB;
 import com.yahoo.ycsb.DBFactory;
 import com.yahoo.ycsb.UnknownDBException;
 import com.yahoo.ycsb.Workload;
+import com.yahoo.ycsb.measurements.Measurements;
 import java.util.ArrayList;
 import java.util.Random;
 import java.util.Timer;
@@ -27,7 +27,7 @@ public class ClientManager {
     public ArrayList<ClientThread> clients;
     public Workload workload;
     public Distribution distribution;
-    //public ArrayList<LogEntry> timelineHistory;
+    public ArrayList<LogEntry> timelineHistory;
     public String dbName;
     public int currentTimelineIndex = 0;
     public Timer timer;
@@ -35,11 +35,11 @@ public class ClientManager {
     // between two Entries defined by the user in the config file
     public static float INTERPOLATION_STEP = 1f;
 
-    public ClientManager(Distribution distribution, Workload workload) {
+    public ClientManager(Distribution distribution, Sla sla, Workload workload) {
         this.clients = new ArrayList<ClientThread>();
         this.distribution = distribution;
         this.workload = workload;
-        //this.timelineHistory = new ArrayList<LogEntry>();
+        this.timelineHistory = new ArrayList<LogEntry>();
         this.dbName = workload.properties.getProperty("db", "com.yahoo.ycsb.BasicDB");
     }
 
@@ -53,8 +53,9 @@ public class ClientManager {
 
             if (initialValue > 0) {
                 // set the start time of the workload
-                // TODO: figure out where YCSB sets the initial time of an workload
-                // workload.startTime = System.nanoTime();
+                workload.startTime = System.nanoTime();
+                
+                Measurements.setStartTime(workload.startTime);
 
                 // create first group of clients
                 add(distribution.timeline.get(0).value);
@@ -99,7 +100,7 @@ public class ClientManager {
                     client.start();
                     // adds a new entry in the history
                     // TODO: define how to save the number of clients
-                    //timelineHistory.add(new LogEntry(getIntervalFromBeginning(), clients.size()));
+                    timelineHistory.add(new LogEntry(getIntervalFromBeginning(), clients.size()));
                 } catch (Exception ex) {
                     Logger.getLogger(ClientManager.class.getName()).log(Level.WARNING, null, "Error when executing a client");
                 }
@@ -121,11 +122,11 @@ public class ClientManager {
                 generator = new Random();
                 int index = generator.nextInt(this.clients.size());
                 if (index > -1) {
-                    this.clients.get(index).interrupt();
+                    this.clients.get(index).setStopRequested(true);
                     this.clients.remove(index);
                     // adds a new entry in the history
                     // TODO: define how to save the number of clients
-                    //timelineHistory.add(new LogEntry(getIntervalFromBeginning(), clients.size()));
+                    timelineHistory.add(new LogEntry(getIntervalFromBeginning(), clients.size()));
                 }
             }
         }
