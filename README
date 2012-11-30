@@ -1,30 +1,32 @@
-Yahoo! Cloud System Benchmark (YCSB)
+BenchXtend - based on Yahoo! Cloud System Benchmark (YCSB)
 ====================================
 
-Links
------
-http://wiki.github.com/brianfrankcooper/YCSB/
-http://research.yahoo.com/Web_Information_Management/YCSB
-ycsb-users@yahoogroups.com
+BenchXtend is a tool that extends YCSB to include the following features:
+- Variation of clients during workload execution according to a pre-defined timeline
+- Calculation of elasticity metrics of database systems in cloud, both in under and overprovisioning scenarios
+
+For information about the regular YCSB take a look at https://github.com/brianfrankcooper/YCSB
 
 Getting Started
 ---------------
 
-1. Download the latest release of YCSB:
-
-    wget https://github.com/downloads/brianfrankcooper/YCSB/ycsb-0.1.4.tar.gz
-    tar xfvz ycsb-0.1.4
-    cd ycsb-0.1.4
+1. Download the latest release of BenchXtend.
 
 2. Set up a database to benchmark. There is a README file under each binding
    directory.
 
-3. Run YCSB command. 
+3. Run YCSB command, but with BenchXtend features:
 
     bin/ycsb load basic -P workloads/workloada
-    bin/ycsb run basic -P workloads/workloada
+    bin/ycsb run basic -P workloads/workloada -timeline timeline.xml -sla sla.xml
 
-   Running the `ycsb` command without any argument will print the usage. 
+   timeline.xml file: formatted to list the number of expected clients in each 
+   of the workload execution. This way, it is possible to vary the number of clients 
+   in a way that fits better to a specific application environment.
+
+   sla.xml: defines the expected time for each operation (read, update, ...). It 
+   establishes, theoretically, the agreement between a service provider and a 
+   service consumer. 
    
    See https://github.com/brianfrankcooper/YCSB/wiki/Running-a-Workload
    for a detailed documentation on how to run a workload.
