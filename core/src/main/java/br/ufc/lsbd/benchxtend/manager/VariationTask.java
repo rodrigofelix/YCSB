@@ -48,12 +48,24 @@ public class VariationTask extends TimerTask {
             // removes all the clients
             manager.remove(last);
             
+            // TODO: IMPORTANT - Go ahead only after all threads have finished
+            
             long endTime = System.currentTimeMillis();
             
             System.out.println("Removing last " + last + " clients");
             
             // stops the timer
             manager.timer.cancel();
+            
+            System.out.println("-------------------------------");
+            System.out.println("Printing time, # of machines");
+            
+            // ExecutionLog.persist(manager.workload.measurements, ExecutionLog.EXECUTION);
+            // TODO: find a way to save this log using a measurement exporter
+            // TODO: figure out why this must be called before exportMeasurements 
+            ExecutionLog.persist(manager.timelineHistory, ExecutionLog.TIMELINE);
+            
+            System.out.println("-------------------------------");
             
             // starts the process of persisting the execution log
             try {
@@ -62,10 +74,6 @@ public class VariationTask extends TimerTask {
                 System.err.println("Could not export measurements, error: " + e.getMessage());
                 System.exit(-1);
             }
-            
-            // ExecutionLog.persist(manager.workload.measurements, ExecutionLog.EXECUTION);
-            // TODO: find a way to save this log using a measurement exporter
-            ExecutionLog.persist(manager.timelineHistory, ExecutionLog.TIMELINE);
         }
     }
 }

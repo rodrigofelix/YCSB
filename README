@@ -23,7 +23,7 @@ Getting Started
    timeline.xml file: formatted to list the number of expected clients in each 
    of the workload execution. This way, it is possible to vary the number of clients 
    in a way that fits better to a specific application environment.
-
+    
    sla.xml: defines the expected time for each operation (read, update, ...). It 
    establishes, theoretically, the agreement between a service provider and a 
    service consumer. 

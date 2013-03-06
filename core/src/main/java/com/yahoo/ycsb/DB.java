@@ -17,6 +17,8 @@
 
 package com.yahoo.ycsb;
 
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Properties;
 import java.util.Set;
@@ -80,6 +82,23 @@ public abstract class DB
 	public void cleanup() throws DBException
 	{
 	}
+        
+        /**
+         * Reloads the properties file to check if new hosts were added at 
+         * execution time
+         */
+        public void reloadHosts(){
+            String propfile = getProperties().getProperty("propfile");
+            
+            Properties myfileprops = new Properties();
+            try {
+                myfileprops.load(new FileInputStream(propfile));
+                getProperties().setProperty("hosts", myfileprops.getProperty("hosts"));
+            } catch (IOException e) {
+                System.out.println(e.getMessage());
+                System.exit(0);
+            }
+        }
 
 	/**
 	 * Read a record from the database. Each field/value pair from the result will be stored in a HashMap.

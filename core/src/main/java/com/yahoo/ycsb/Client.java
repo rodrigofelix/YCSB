@@ -82,6 +82,11 @@ public class Client {
             System.out.println("Missing property: " + WORKLOAD_PROPERTY);
             return false;
         }
+        
+        if (props.getProperty("propfile") == null) {
+            System.out.println("It is mandatory to pass a property file containing the hosts property");
+            return false;
+        }
 
         return true;
     }
@@ -253,6 +258,7 @@ public class Client {
                     System.exit(0);
                 }
                 String propfile = args[argindex];
+                props.setProperty("propfile", args[argindex]);
                 argindex++;
 
                 Properties myfileprops = new Properties();

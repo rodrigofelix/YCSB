@@ -123,6 +123,7 @@ public class ClientManager {
                 int index = generator.nextInt(this.clients.size());
                 if (index > -1) {
                     this.clients.get(index).setStopRequested(true);
+                    // TODO: think if remove can be called just after setting the thread to be stopped
                     this.clients.remove(index);
                     // adds a new entry in the history
                     // TODO: define how to save the number of clients
