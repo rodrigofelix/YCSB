@@ -112,8 +112,12 @@ public class CassandraClient10 extends DB {
         Exception connectexception = null;
 
         for (int retry = 0; retry < ConnectionRetries; retry++) {
-            System.out.println("Attempt #" + (new Integer(retry)).toString() + " on host " + host);
+            if (_debug) {
+                System.out.println("Attempt #" + (new Integer(retry)).toString() + " on host " + host);
+            }
+
             connect();
+
             try {
                 tr.open();
                 connectexception = null;
@@ -129,7 +133,9 @@ public class CassandraClient10 extends DB {
             // gets another host, if the selected one is not connecting
             // in up to 10 attempts
             if (retry % 5 == 4) {
-                System.out.println("Retesting init after trying with " + host);
+                if (_debug) {
+                    System.out.println("Retesting init after trying with " + host);
+                }
                 assignRandomHost();
             }
         }
@@ -165,12 +171,16 @@ public class CassandraClient10 extends DB {
 
         String[] allhosts = hosts.split(",");
 
-        System.out.println(hosts);
+        if (_debug) {
+            System.out.println("Hosts list: " + hosts);
+        }
 
         // if no host was set yet
         if (host == null) {
             host = allhosts[random.nextInt(allhosts.length)];
-            System.out.println("Host: " + host);
+            if (_debug) {
+                System.out.println("Setting host for the new client: " + host);
+            }
         } else {
             // if a host was already set, gets a different one if there is more than one
             if (allhosts.length > 1) {
@@ -180,6 +190,9 @@ public class CassandraClient10 extends DB {
                     index = random.nextInt(allhosts.length);
                     host = allhosts[index];
                 } while (host.equals(currentHost));
+                if (_debug) {
+                    System.out.println("Changing host from " + currentHost + " to " + host);
+                }
             }
         }
     }
@@ -222,7 +235,9 @@ public class CassandraClient10 extends DB {
         }
 
         for (int i = 0; i < OperationRetries; i++) {
-            System.out.println("Read #" + (new Integer(i)).toString() + " on host " + host);
+            if (_debug) {
+                System.out.println("Reading key " + key + " #" + (new Integer(i)).toString() + " on host " + host);
+            }
             try {
                 SlicePredicate predicate;
                 if (fields == null) {
@@ -267,7 +282,7 @@ public class CassandraClient10 extends DB {
                 return Ok;
             } catch (Exception e) {
                 errorexception = e;
-                System.out.println(e.toString());
+                e.printStackTrace(System.out);
             }
 
             try {
@@ -275,14 +290,17 @@ public class CassandraClient10 extends DB {
             } catch (InterruptedException e) {
             }
 
-            System.out.println("Failed attempt " + i);
-
+            if (_debug) {
+                System.out.println("Failed attempt " + i);
+            }
 
             // TODO: somehow reuse this for all operations
             // gets another host, if the selected one is not connecting
             // in up to 10 attempts
             if (i % 10 == 9) {
-                System.out.println("Failed on read query");
+                if (_debug) {
+                    System.out.println("Failed on read query: " + key);
+                }
 
                 assignRandomHost();
 
@@ -290,8 +308,12 @@ public class CassandraClient10 extends DB {
 
                 // tries to connect 3 times
                 for (int retry = 0; retry < 3; retry++) {
-                    System.out.println("Retesting read after trying with " + host);
+                    if (_debug) {
+                        System.out.println("Retesting read after trying with " + host);
+                    }
+
                     connect();
+
                     try {
                         tr.open();
                         connected = true;
@@ -403,9 +425,12 @@ public class CassandraClient10 extends DB {
             // gets another host, if the selected one is not connecting
             // in up to 10 attempts
             if (i % 10 == 9) {
-                System.out.println("Failed on scan query");
+                if (_debug) {
+                    System.out.println("Failed on scan query: " + startkey);
+                }
 
                 assignRandomHost();
+
                 connect();
 
                 Boolean connected = false;
@@ -519,9 +544,12 @@ public class CassandraClient10 extends DB {
             // gets another host, if the selected one is not connecting
             // in up to 10 attempts
             if (i % 10 == 9) {
-                System.out.println("Failed on insert query");
+                if (_debug) {
+                    System.out.println("Failed on insert query: " + key);
+                }
 
                 assignRandomHost();
+
                 connect();
 
                 Boolean connected = false;
@@ -596,16 +624,21 @@ public class CassandraClient10 extends DB {
             // gets another host, if the selected one is not connecting
             // in up to 10 attempts
             if (i % 10 == 9) {
-                System.out.println("Failed on delete query");
+                if (_debug) {
+                    System.out.println("Failed on delete query: " + key);
+                }
 
                 assignRandomHost();
+
                 connect();
 
                 Boolean connected = false;
 
                 // tries to connect 3 times
                 for (int retry = 0; retry < 3; retry++) {
-                    System.out.println("Retesting delete after trying with " + host);
+                    if (_debug) {
+                        System.out.println("Re-running delete after trying with " + host);
+                    }
                     connect();
                     try {
                         tr.open();

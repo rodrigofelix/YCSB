@@ -417,7 +417,8 @@ public class Client {
         }
 
         // 1st case: Follows BenchXtend approach varying the number of clients
-        if (distribution != null) {
+        // load phase is let as an activity of basic flow
+        if (dotransactions && distribution != null) {
             // instantiates manager to create (and remove) ClientThreads
             ClientManager manager = new ClientManager(distribution, sla, workload);
             manager.init();

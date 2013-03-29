@@ -83,7 +83,7 @@ public class DBWrapper extends DB {
         long st = System.nanoTime();
         int res = _db.read(table, key, fields, result);
         long en = System.nanoTime();
-        _measurements.measure("READ", (int) ((en - st) / 1000));
+        _measurements.measure("READ", st, (int) ((en - st) / 1000));
         _measurements.reportReturnCode("READ", res);
         return res;
     }
@@ -105,7 +105,7 @@ public class DBWrapper extends DB {
         long st = System.nanoTime();
         int res = _db.scan(table, startkey, recordcount, fields, result);
         long en = System.nanoTime();
-        _measurements.measure("SCAN", (int) ((en - st) / 1000));
+        _measurements.measure("SCAN", st, (int) ((en - st) / 1000));
         _measurements.reportReturnCode("SCAN", res);
         return res;
     }
@@ -125,7 +125,7 @@ public class DBWrapper extends DB {
         long st = System.nanoTime();
         int res = _db.update(table, key, values);
         long en = System.nanoTime();
-        _measurements.measure("UPDATE", (int) ((en - st) / 1000));
+        _measurements.measure("UPDATE", st, (int) ((en - st) / 1000));
         _measurements.reportReturnCode("UPDATE", res);
         return res;
     }
@@ -145,7 +145,7 @@ public class DBWrapper extends DB {
         long st = System.nanoTime();
         int res = _db.insert(table, key, values);
         long en = System.nanoTime();
-        _measurements.measure("INSERT", (int) ((en - st) / 1000));
+        _measurements.measure("INSERT", st, (int) ((en - st) / 1000));
         _measurements.reportReturnCode("INSERT", res);
         return res;
     }
@@ -162,7 +162,7 @@ public class DBWrapper extends DB {
         long st = System.nanoTime();
         int res = _db.delete(table, key);
         long en = System.nanoTime();
-        _measurements.measure("DELETE", (int) ((en - st) / 1000));
+        _measurements.measure("DELETE", st, (int) ((en - st) / 1000));
         _measurements.reportReturnCode("DELETE", res);
         return res;
     }

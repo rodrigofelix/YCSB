@@ -95,7 +95,7 @@ public class ClientThread extends Thread {
 
         // checks if a timeline was provided. If yes, follows BenchXtend approach.
         // otherwise, follows the basic flow of YCSB
-        if (_workload.properties.containsKey("distribution") && _workload.properties.getProperty("distribution").equals("true")) {
+        if (_workload.dotransactions && _workload.properties.containsKey("distribution") && _workload.properties.getProperty("distribution").equals("true")) {
             // unlike YCSB, Benchxtend runs queries while it is not said to stop.
             // this is make in order to keep the number of clients according to 
             // the distribution defined in the timeline        

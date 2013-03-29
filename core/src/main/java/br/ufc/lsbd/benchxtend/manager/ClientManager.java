@@ -54,8 +54,8 @@ public class ClientManager {
             if (initialValue > 0) {
                 // set the start time of the workload
                 workload.startTime = System.nanoTime();
-                
-                Measurements.setStartTime(workload.startTime);
+
+                Measurements.setWorkloadStartTime(workload.startTime);
 
                 // create first group of clients
                 add(distribution.timeline.get(0).value);
@@ -117,17 +117,28 @@ public class ClientManager {
     public void remove(int number) {
         if (number > 0) {
             Random generator = null;
+            ArrayList<Integer> active;
             for (int i = 0; i < number; i++) {
                 // selects a random client to be removed
                 generator = new Random();
-                int index = generator.nextInt(this.clients.size());
+
+                active = new ArrayList<Integer>();
+
+                // gets the list of active clients
+                for (int j = 0; j < this.clients.size(); j++) {
+                    if (!this.clients.get(j).isStopRequested()) {
+                        active.add(j);
+                    }
+                }
+
+                int index = generator.nextInt(active.size());
                 if (index > -1) {
-                    this.clients.get(index).setStopRequested(true);
+                    this.clients.get(active.get(index)).setStopRequested(true);
                     // TODO: think if remove can be called just after setting the thread to be stopped
-                    this.clients.remove(index);
+                    //this.clients.remove(index);
                     // adds a new entry in the history
                     // TODO: define how to save the number of clients
-                    timelineHistory.add(new LogEntry(getIntervalFromBeginning(), clients.size()));
+                    timelineHistory.add(new LogEntry(getIntervalFromBeginning(), active.size()));
                 }
             }
         }

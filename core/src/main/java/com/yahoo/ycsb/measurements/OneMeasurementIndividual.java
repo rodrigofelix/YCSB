@@ -23,15 +23,15 @@ public class OneMeasurementIndividual extends OneMeasurement {
     int count=0;
     int min;
     int max;
-    long startTime;
+    long workloadStartTime;
     Distribution distribution;
     Sla sla;
     ArrayList<int[]> responseTimes;
     private HashMap<Integer, int[]> returncodes;
 
-    public OneMeasurementIndividual(String name, Properties props, Sla sla, Distribution distribution, long startTime) {
+    public OneMeasurementIndividual(String name, Properties props, Sla sla, Distribution distribution, long workloadStartTime) {
         super(name);
-        this.startTime = startTime;
+        this.workloadStartTime = workloadStartTime;
         this.sla = sla;
         this.distribution = distribution;
         totallatency = 0;
@@ -52,12 +52,19 @@ public class OneMeasurementIndividual extends OneMeasurement {
         returncodes.get(Icode)[0]++;
     }
 
+    /**
+     * reports the time that a query was started and the spent time to execute
+     * it. the moment a query started is important to check the number of 
+     * active clients in that specific moment
+     * 
+     * @param startTime time when a single query was started
+     * @param latency time spent up to execute the query
+     */
     @Override
-    public void measure(int latency) {
-        
+    public void measure(long startTime, int latency) {
         int[] values = new int[3];
         values[0] = latency;
-        values[1] = (int) ((System.nanoTime() - this.startTime) / 1000);
+        values[1] = (int) ((startTime - this.workloadStartTime) / 1000);
         
         responseTimes.add(values);
 
@@ -71,6 +78,15 @@ public class OneMeasurementIndividual extends OneMeasurement {
         if ((latency < min) || (min < 0)) {
             min = latency;
         }
+    }
+    
+    /**
+     * considers the start time as the current time
+     * @param latency 
+     */
+    @Override
+    public void measure(int latency) {
+        measure(System.nanoTime(), latency);
     }
 
     @Override
@@ -148,5 +164,5 @@ public class OneMeasurementIndividual extends OneMeasurement {
         elasticitydb = (x * underprov + y * overprov) / (x + y);
         
         exporter.write(getName(), "Elasticitydb metric: ", elasticitydb);
-    }
+    }   
 }

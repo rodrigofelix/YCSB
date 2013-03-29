@@ -7,6 +7,7 @@ package br.ufc.lsbd.benchxtend.manager;
 //import br.ufc.lsbd.benchxtend.log.ExecutionLog;
 import br.ufc.lsbd.benchxtend.ExecutionLog;
 import com.yahoo.ycsb.Client;
+import com.yahoo.ycsb.ClientThread;
 import java.io.IOException;
 import java.util.TimerTask;
 
@@ -48,9 +49,20 @@ public class VariationTask extends TimerTask {
             // removes all the clients
             manager.remove(last);
             
-            // TODO: IMPORTANT - Go ahead only after all threads have finished
+            System.out.println("Waiting for all clients to finish");
             
-            long endTime = System.currentTimeMillis();
+            for (ClientThread t : manager.clients) {
+                try {
+//                    if(t.isAlive()){
+//                        System.out.println("There is a thread still running: ");
+//                    }
+                    // wait for all threads to be completed
+                    t.join();
+                } catch (InterruptedException e) {
+                }
+            }
+            
+            long endTime = System.nanoTime();
             
             System.out.println("Removing last " + last + " clients");
             
@@ -69,7 +81,7 @@ public class VariationTask extends TimerTask {
             
             // starts the process of persisting the execution log
             try {
-                Client.exportMeasurements(manager.workload.properties, 0, endTime - manager.workload.startTime);
+                Client.exportMeasurements(manager.workload.properties, 0, (endTime - manager.workload.startTime) / (1000 * 1000));
             } catch (IOException e) {
                 System.err.println("Could not export measurements, error: " + e.getMessage());
                 System.exit(-1);

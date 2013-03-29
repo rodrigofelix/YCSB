@@ -34,7 +34,7 @@ public class Measurements {
     private static final String MEASUREMENT_TYPE_DEFAULT = "histogram";
     static Measurements singleton = null;
     static Properties measurementproperties = null;
-    static long startTime = -1;
+    static long workloadStartTime = -1;
     static Sla sla;
     static Distribution distribution;
     HashMap<String, OneMeasurement> data;
@@ -51,8 +51,8 @@ public class Measurements {
         distribution = _distribution;
     }
     
-    public static void setStartTime(long _startTime){
-        startTime = _startTime;
+    public static void setWorkloadStartTime(long _workloadStartTime){
+        workloadStartTime = _workloadStartTime;
     }
 
     /**
@@ -88,21 +88,21 @@ public class Measurements {
         }
     }
     
-    private Measurements(Properties props, Sla _sla, Distribution _distribution, long _startTime){
+    private Measurements(Properties props, Sla _sla, Distribution _distribution, long _workloadStartTime){
         this(props);
-        startTime = _startTime;
+        workloadStartTime = _workloadStartTime;
         distribution = _distribution;
         sla = _sla;
     }
 
     OneMeasurement constructOneMeasurement(String name) {
         if (individual) {
-            if(sla == null || distribution == null || startTime == -1){
+            if(sla == null || distribution == null || workloadStartTime == -1){
                 System.out.println("ERROR: SLA, Distribution or StartTime was not set to use Individual "
                         + "measurement. Histogram measurement will be used instead.");
                 return new OneMeasurementHistogram(name, _props);
             }else{
-                return new OneMeasurementIndividual(name, _props, sla, distribution, startTime);
+                return new OneMeasurementIndividual(name, _props, sla, distribution, workloadStartTime);
             }
         } else {
             if (histogram) {
@@ -128,6 +128,33 @@ public class Measurements {
 
         try {
             data.get(operation).measure(latency);
+        } catch (java.lang.ArrayIndexOutOfBoundsException e) {
+            System.out.println("ERROR: java.lang.ArrayIndexOutOfBoundsException - ignoring and continuing");
+            e.printStackTrace();
+            e.printStackTrace(System.out);
+        }
+    }
+    
+    /**
+     * Report a single value of a single metric, but reports also the time
+     * when the query was started. E.g. for read latency, operation="READ" and 
+     * latency is the measured value.
+     * 
+     * @param operation
+     * @param queryStartTime 
+     * @param latency 
+     */
+    public void measure(String operation, long queryStartTime, int latency) {
+        if (!data.containsKey(operation)) {
+            synchronized (this) {
+                if (!data.containsKey(operation)) {
+                    data.put(operation, constructOneMeasurement(operation));
+                }
+            }
+        }
+
+        try {
+            data.get(operation).measure(queryStartTime, latency);
         } catch (java.lang.ArrayIndexOutOfBoundsException e) {
             System.out.println("ERROR: java.lang.ArrayIndexOutOfBoundsException - ignoring and continuing");
             e.printStackTrace();
@@ -172,4 +199,6 @@ public class Measurements {
 
         return ret;
     }
+
+    
 }
