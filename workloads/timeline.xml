@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- defines the way the number of clients should vary -->
+<!-- types: linear, poisson -->
+<distribution type="linear">
+    <!-- explicitly states the number of clients in each time (in seconds) -->
+    <timeline>
+        <entry time="1">25</entry>
+        <entry time="30">55</entry>
+        <entry time="120">125</entry>
+        <entry time="240">150</entry>
+        <entry time="300">120</entry>
+        <entry time="360">115</entry>
+        <entry time="420">50</entry>
+        <entry time="480">20</entry>
+    </timeline>
+    <!-- defines variables to calculate elasticity metrics -->
+    <elasticity>
+        <!-- defines a weight (float, > 0) for overprovision metric to 
+             calculate elasticitydb metric --> 
+        <overprovisionWeight>3</overprovisionWeight>
+        <!-- defines a weight (float, > 0) for underprovision metric to 
+             calculate elasticitydb metric --> 
+        <underprovisionWeight>1</underprovisionWeight>
+        <!-- defines lambda (float, 0 <= lambda < 1) used to define an 
+             acceptance range of overprovision metric -->
+        <!-- lambda is a percentage of expectedTime -->
+        <overprovisionLambda>0.9</overprovisionLambda>
+    </elasticity>
+</distribution>
+
+

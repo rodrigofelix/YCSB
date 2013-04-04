@@ -23,6 +23,7 @@ import com.yahoo.ycsb.measurements.Measurements;
 import com.yahoo.ycsb.measurements.exporter.MeasurementsExporter;
 import com.yahoo.ycsb.measurements.exporter.TextMeasurementsExporter;
 import java.io.*;
+import java.text.SimpleDateFormat;
 import java.util.*;
 
 //import org.apache.log4j.BasicConfigurator;
@@ -352,6 +353,7 @@ public class Client {
         }
         System.out.println();
         System.err.println("Loading workload...");
+        System.out.println("Start time: " + new SimpleDateFormat("yyyy/MM/dd HH:mm:ss").format(new Date()));
 
         //show a warning message that creating the workload is taking a while
         //but only do so if it is taking longer than 2 seconds 

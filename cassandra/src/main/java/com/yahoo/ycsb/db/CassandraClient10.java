@@ -26,6 +26,8 @@ import java.util.Properties;
 import java.util.Random;
 import java.util.Set;
 import java.util.Vector;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import org.apache.cassandra.thrift.*;
 import org.apache.thrift.protocol.TBinaryProtocol;
 import org.apache.thrift.protocol.TProtocol;
@@ -281,6 +283,7 @@ public class CassandraClient10 extends DB {
 
                 return Ok;
             } catch (Exception e) {
+                System.out.println("READ - Exception on thread: " + Thread.currentThread().getId());
                 errorexception = e;
                 e.printStackTrace(System.out);
             }
@@ -360,7 +363,7 @@ public class CassandraClient10 extends DB {
                 return Error;
             }
         }
-
+        
         for (int i = 0; i < OperationRetries; i++) {
 
             try {
@@ -413,6 +416,7 @@ public class CassandraClient10 extends DB {
 
                 return Ok;
             } catch (Exception e) {
+                System.out.println("SCAN - Exception on thread: " + Thread.currentThread().getId());
                 errorexception = e;
             }
             try {
@@ -533,6 +537,7 @@ public class CassandraClient10 extends DB {
 
                 return Ok;
             } catch (Exception e) {
+                System.out.println("INSERT - Exception on thread: " + Thread.currentThread().getId());
                 errorexception = e;
             }
             try {
@@ -613,6 +618,7 @@ public class CassandraClient10 extends DB {
 
                 return Ok;
             } catch (Exception e) {
+                System.out.println("DELETE - Exception on thread: " + Thread.currentThread().getId());
                 errorexception = e;
             }
             try {
@@ -744,4 +750,18 @@ public class CassandraClient10 extends DB {
      *
      * }
      */
+    
+    public void printHeap(){
+        int mb = 1024*1024;
+         
+        //Getting the runtime reference from system
+        Runtime runtime = Runtime.getRuntime();
+         
+        //Print used memory
+        System.err.println("Memory: "
+           + (runtime.totalMemory() - runtime.freeMemory()) / mb
+           + ", " + runtime.freeMemory() / mb
+           + ", " + runtime.totalMemory() / mb
+           + ", " + runtime.maxMemory() / mb);
+    }
 }

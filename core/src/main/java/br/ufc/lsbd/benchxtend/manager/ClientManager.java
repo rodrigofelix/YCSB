@@ -80,6 +80,7 @@ public class ClientManager {
     public void add(int number) {
         if (number > 0) {
             ClientThread client = null;
+            int total_active = 0;
             for (int i = 0; i < number; i++) {
 
                 // creates the connection before start the thread to measure only
@@ -95,12 +96,21 @@ public class ClientManager {
                 //client = new Client(config, workload);
                 client = new ClientThread(db, this.workload.dotransactions, workload, i, number, this.workload.properties, -1, -1);
                 clients.add(client);
+                
+                total_active = 0;
+
+                // gets the list of active clients
+                for (int j = 0; j < this.clients.size(); j++) {
+                    if (!this.clients.get(j).isStopRequested()) {
+                        total_active++;
+                    }
+                }
+                
                 try {
                     // starts the thread that will send the queries
                     client.start();
                     // adds a new entry in the history
-                    // TODO: define how to save the number of clients
-                    timelineHistory.add(new LogEntry(getIntervalFromBeginning(), clients.size()));
+                    timelineHistory.add(new LogEntry(getIntervalFromBeginning(), total_active));
                 } catch (Exception ex) {
                     Logger.getLogger(ClientManager.class.getName()).log(Level.WARNING, null, "Error when executing a client");
                 }
@@ -130,22 +140,19 @@ public class ClientManager {
                         active.add(j);
                     }
                 }
-
+                
                 int index = generator.nextInt(active.size());
                 if (index > -1) {
                     this.clients.get(active.get(index)).setStopRequested(true);
-                    // TODO: think if remove can be called just after setting the thread to be stopped
-                    //this.clients.remove(index);
                     // adds a new entry in the history
-                    // TODO: define how to save the number of clients
                     timelineHistory.add(new LogEntry(getIntervalFromBeginning(), active.size()));
                 }
             }
         }
     }
 
-    public int getIntervalFromBeginning() {
-        return (int) ((System.nanoTime() - this.workload.startTime) / 1000);
+    public long getIntervalFromBeginning() {
+        return (long) ((System.nanoTime() - this.workload.startTime) / 1000);
     }
 
     public void generateTimeline() {

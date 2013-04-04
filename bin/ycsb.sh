@@ -25,7 +25,7 @@
 #export YCSB_OPTS="-Djava.compiler=NONE"
 
 # YCSB client heap size.
-#export YCSB_HEAP_SIZE=500
+export YCSB_HEAP_SIZE=900
 
 this=`dirname "$0"`
 this=`cd "$this"; pwd`
@@ -75,7 +75,7 @@ else
   exit 1
 fi
 
-JAVA_HEAP_MAX=-Xmx500m
+JAVA_HEAP_MAX=-Xmx1000m
 # check envvars which might override default args
 if [ "$YCSB_HEAP_SIZE" != "" ]; then
   JAVA_HEAP_MAX="-Xmx""$YCSB_HEAP_SIZE""m"

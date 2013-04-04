@@ -48,11 +48,11 @@
             <version>0.1.4</version>
             <type>jar</type>
         </dependency>
-        <dependency>
+        <!--dependency>
             <groupId>${project.groupId}</groupId>
             <artifactId>cassandra-binding</artifactId>
             <version>${project.version}</version>
-        </dependency>
+        </dependency-->
     </dependencies>	
 
 </project>

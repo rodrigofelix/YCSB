@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- defines the list of expected times for each type of operation -->
+<sla>
+    <!-- query with expected time for such an operation (in microseconds) -->
+    <query type="READ" time="40000"/>
+    <query type="UPDATE" time="30000"/>
+    <query type="DELETE" time="40000"/>
+    <query type="INSERT" time="40000"/>
+    <query type="SCAN" time="70000"/>
+</sla>

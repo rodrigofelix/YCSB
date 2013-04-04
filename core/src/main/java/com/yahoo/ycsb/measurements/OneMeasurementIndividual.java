@@ -20,13 +20,13 @@ import java.util.Properties;
 public class OneMeasurementIndividual extends OneMeasurement {
 
     long totallatency;
-    int count=0;
+    int count = 0;
     int min;
     int max;
     long workloadStartTime;
     Distribution distribution;
     Sla sla;
-    ArrayList<int[]> responseTimes;
+    ArrayList<long[]> responseTimes;
     private HashMap<Integer, int[]> returncodes;
 
     public OneMeasurementIndividual(String name, Properties props, Sla sla, Distribution distribution, long workloadStartTime) {
@@ -37,7 +37,7 @@ public class OneMeasurementIndividual extends OneMeasurement {
         totallatency = 0;
         min = -1;
         max = -1;
-        responseTimes = new ArrayList<int[]>();
+        responseTimes = new ArrayList<long[]>();
         returncodes = new HashMap<Integer, int[]>();
     }
 
@@ -54,18 +54,18 @@ public class OneMeasurementIndividual extends OneMeasurement {
 
     /**
      * reports the time that a query was started and the spent time to execute
-     * it. the moment a query started is important to check the number of 
-     * active clients in that specific moment
-     * 
+     * it. the moment a query started is important to check the number of active
+     * clients in that specific moment
+     *
      * @param startTime time when a single query was started
-     * @param latency time spent up to execute the query
+     * @param latency time spent up to execute the query (in microseconds)
      */
     @Override
     public void measure(long startTime, int latency) {
-        int[] values = new int[3];
+        long[] values = new long[3];
         values[0] = latency;
-        values[1] = (int) ((startTime - this.workloadStartTime) / 1000);
-        
+        values[1] = (long) ((startTime - this.workloadStartTime) / 1000); // in microseconds
+
         responseTimes.add(values);
 
         count++;
@@ -79,10 +79,11 @@ public class OneMeasurementIndividual extends OneMeasurement {
             min = latency;
         }
     }
-    
+
     /**
      * considers the start time as the current time
-     * @param latency 
+     *
+     * @param latency
      */
     @Override
     public void measure(int latency) {
@@ -97,40 +98,67 @@ public class OneMeasurementIndividual extends OneMeasurement {
     @Override
     public void exportMeasurements(MeasurementsExporter exporter) throws IOException {
         DecimalFormat d = new DecimalFormat("#.##");
-        
+
         exporter.write(getName(), "Total Queries: ", count);
         exporter.write(getName(), "Total Latency: ", totallatency);
         exporter.write(getName(), "Average Latency (us): ", d.format(totallatency / count));
         exporter.write(getName(), "Min Latency (us): ", d.format(min / count));
         exporter.write(getName(), "Max Latency (us): ", d.format(max / count));
-        
+
         ArrayList<Float> underprovSet = new ArrayList<Float>();
         ArrayList<Float> overprovSet = new ArrayList<Float>();
         long expectedTime = sla.getTimeByType(getName());
-        
+
         for (int i = 0; i < responseTimes.size(); i++) {
-            exporter.write(getName(), "Query", responseTimes.get(i)[0] + ", " + responseTimes.get(i)[1]);
-            
-            if(responseTimes.get(i)[0] > expectedTime){
-                // calculates the rate violated / expected in an underprovisioning scenario
-                underprovSet.add((float) responseTimes.get(i)[0] / expectedTime);
-            }else if(responseTimes.get(i)[0] < expectedTime - (distribution.elasticity.overprovisionLambda * expectedTime)){
-                // calculates the rate expected / violated in an overprovisioning scenario
-                overprovSet.add((float) expectedTime / responseTimes.get(i)[0]);
+            if (responseTimes.get(i) != null) {
+                exporter.write(getName(), "Query", responseTimes.get(i)[0] + ", " + responseTimes.get(i)[1]);
+
+                if (responseTimes.get(i)[0] > expectedTime) {
+                    // calculates the rate violated / expected in an underprovisioning scenario
+                    underprovSet.add((float) responseTimes.get(i)[0] / expectedTime);
+                } else if (responseTimes.get(i)[0] < expectedTime - (distribution.elasticity.overprovisionLambda * expectedTime)) {
+                    // calculates the rate expected / violated in an overprovisioning scenario
+                    overprovSet.add((float) expectedTime / responseTimes.get(i)[0]);
+                }
             }
         }
-        
+
+        int current_second = 1;
+        int avg_counter = 0;
+        long sum = 0;
+        long latency;
+        long time;
+
+        // calculates average of response time for each second
+        for (int i = 0; i < responseTimes.size(); i++) {
+            time = responseTimes.get(i)[1];
+            latency = responseTimes.get(i)[0];
+            if ((time / 1000000f) > current_second) {
+                exporter.write(getName(), "Average", (current_second * 1000000) + ", " + ((avg_counter > 0) ? (sum / avg_counter) : 0));
+
+                sum = latency;
+                avg_counter = 1;
+
+                do {
+                    current_second++;
+                } while (current_second < (time / 1000000f));
+            } else {
+                sum += latency;
+                avg_counter++;
+            }
+        }
+
         float underprov = 0;
         float overprov = 0;
-        
+
         if (underprovSet.size() > 0) {
             float total = 0f;
-            
+
             // calculates the sum of rates
-            for(Float f : underprovSet){
+            for (Float f : underprovSet) {
                 total += f;
             }
-            
+
             // calculates actually underprov metric, ie. the arithmetic average of rates
             underprov = (total / (float) underprovSet.size());
             exporter.write(getName(), "Underprov: ", underprov);
@@ -139,15 +167,15 @@ public class OneMeasurementIndividual extends OneMeasurement {
             exporter.write(getName(), "Underprov: ", 0);
             exporter.write(getName(), "Total of underprov queries: ", 0);
         }
-        
+
         if (overprovSet.size() > 0) {
             float total = 0f;
-            
+
             // calculates the sum of rates
-            for(Float f : overprovSet){
+            for (Float f : overprovSet) {
                 total += f;
             }
-            
+
             // calculates actually underprov metric, ie. the arithmetic average of rates
             overprov = total / (float) overprovSet.size();
             exporter.write(getName(), "Overprov metric: ", overprov);
@@ -156,13 +184,13 @@ public class OneMeasurementIndividual extends OneMeasurement {
             exporter.write(getName(), "Overprov metric: ", 0);
             exporter.write(getName(), "Total of overprov queries: ", 0);
         }
-        
+
         // calculates the elasticitydb metric
         float elasticitydb;
         float x = distribution.elasticity.underprovisionWeight;
         float y = distribution.elasticity.overprovisionWeight;
         elasticitydb = (x * underprov + y * overprov) / (x + y);
-        
+
         exporter.write(getName(), "Elasticitydb metric: ", elasticitydb);
-    }   
+    }
 }
