@@ -83,7 +83,7 @@ public class Client {
             System.out.println("Missing property: " + WORKLOAD_PROPERTY);
             return false;
         }
-        
+
         if (props.getProperty("propfile") == null) {
             System.out.println("It is mandatory to pass a property file containing the hosts property");
             return false;
@@ -263,8 +263,11 @@ public class Client {
                 argindex++;
 
                 Properties myfileprops = new Properties();
+                FileInputStream stream;
                 try {
-                    myfileprops.load(new FileInputStream(propfile));
+                    stream = new FileInputStream(propfile);
+                    myfileprops.load(stream);
+                    stream.close();
                 } catch (IOException e) {
                     System.out.println(e.getMessage());
                     System.exit(0);
@@ -443,8 +446,6 @@ public class Client {
                 //t.start();
             }
 
-            // TODO: make StatusThread work over a dynamic set of threads, since status 
-            // thread iterates over a fixed pre-defined number of threads in the Vector threads
             StatusThread statusthread = null;
 
             if (status) {

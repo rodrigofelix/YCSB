@@ -9,13 +9,12 @@ import br.ufc.lsbd.benchxtend.ExecutionLog;
 import com.yahoo.ycsb.Client;
 import com.yahoo.ycsb.ClientThread;
 import java.io.IOException;
-import java.util.TimerTask;
 
 /**
  *
  * @author rodrigofelix
  */
-public class VariationTask extends TimerTask {
+public class VariationTask implements Runnable {
 
     public ClientManager manager;
 
@@ -61,11 +60,10 @@ public class VariationTask extends TimerTask {
                     e.printStackTrace(System.out);
                 }
             }
-            
-            // stops the timer
-            manager.timer.cancel();
-            manager.timer.purge();
-            
+
+            // when everything is finished, shutdown the executor
+            manager.executor.shutdown();
+
             long endTime = System.nanoTime();
 
             System.out.println("-------------------------------");
@@ -83,7 +81,7 @@ public class VariationTask extends TimerTask {
             } catch (IOException e) {
                 System.err.println("Could not export measurements, error: " + e.getMessage());
                 System.exit(-1);
-            } 
+            }
         }
     }
 }

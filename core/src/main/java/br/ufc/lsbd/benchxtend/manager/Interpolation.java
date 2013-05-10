@@ -31,7 +31,7 @@ public class Interpolation {
      */
     public static int getIntermediateValue(Entry current, Entry next, int index, float step, String type) {
         if (type.equals(POISSON)) {
-            return getPoissonValue(current.value);
+            return getPoissonValue(next.value);
         } else if (type.equals(LINEAR)) {
             return getLinearValue(current, next, index, step);
         } else {

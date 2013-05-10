@@ -110,6 +110,7 @@ public class OneMeasurementIndividual extends OneMeasurement {
         long expectedTime = sla.getTimeByType(getName());
 
         for (int i = 0; i < responseTimes.size(); i++) {
+            // TODO: figure out why responseTimes.get(i) can be null
             if (responseTimes.get(i) != null) {
                 exporter.write(getName(), "Query", responseTimes.get(i)[0] + ", " + responseTimes.get(i)[1]);
 
@@ -131,20 +132,23 @@ public class OneMeasurementIndividual extends OneMeasurement {
 
         // calculates average of response time for each second
         for (int i = 0; i < responseTimes.size(); i++) {
-            time = responseTimes.get(i)[1];
-            latency = responseTimes.get(i)[0];
-            if ((time / 1000000f) > current_second) {
-                exporter.write(getName(), "Average", (current_second * 1000000) + ", " + ((avg_counter > 0) ? (sum / avg_counter) : 0));
+            // TODO: figure out why responseTimes.get(i) can be null
+            if (responseTimes.get(i) != null) {
+                time = responseTimes.get(i)[1];
+                latency = responseTimes.get(i)[0];
+                if ((time / 1000000f) > current_second) {
+                    exporter.write(getName(), "Average", (current_second * 1000000) + ", " + ((avg_counter > 0) ? (sum / avg_counter) : 0));
 
-                sum = latency;
-                avg_counter = 1;
+                    sum = latency;
+                    avg_counter = 1;
 
-                do {
-                    current_second++;
-                } while (current_second < (time / 1000000f));
-            } else {
-                sum += latency;
-                avg_counter++;
+                    do {
+                        current_second++;
+                    } while (current_second < (time / 1000000f));
+                } else {
+                    sum += latency;
+                    avg_counter++;
+                }
             }
         }
 

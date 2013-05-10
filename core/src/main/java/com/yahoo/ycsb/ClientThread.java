@@ -101,7 +101,6 @@ public class ClientThread extends Thread {
             // the distribution defined in the timeline        
 
             while (!this.isStopRequested()) {
-                long st = System.currentTimeMillis();
                 if (_dotransactions) {
                     _workload.doTransaction(_db, _workloadstate);
                 } else {
@@ -110,8 +109,8 @@ public class ClientThread extends Thread {
 
                 if (Workload.SLEEP_TIME_BETWEEN_QUERIES > 0) {
                     try {
-                        // waits for 0.1 before doing a new transaction
-                        Thread.sleep(Workload.SLEEP_TIME_BETWEEN_QUERIES);
+                        // waits for 1s before doing a new transaction
+                        sleep(Workload.SLEEP_TIME_BETWEEN_QUERIES);
                     } catch (InterruptedException ex) {
                         try {
                             _db.cleanup();

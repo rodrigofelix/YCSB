@@ -9,6 +9,7 @@ import java.io.FileWriter;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.util.ArrayList;
+import java.util.Vector;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -21,7 +22,7 @@ public class ExecutionLog {
     public static final String EXECUTION = "dasds/execution.log";
     public static final String TIMELINE = "dasd/timeline.log";
 
-    public static void persist(ArrayList entries, String type) {
+    public static void persist(Vector entries, String type) {
 
         // gets the path where jar is being executed
 //        String path = ExecutionLog.class.getProtectionDomain().getCodeSource().getLocation().getPath();
@@ -30,17 +31,17 @@ public class ExecutionLog {
 //        try {
 //            decodedPath = URLDecoder.decode(path, "UTF-8");
 
-            if (entries.size() > 0) {
+        if (entries.size() > 0) {
 
-                // prints log in the regular output
-                for (int i = 0; i < entries.size(); i++) {
-                    if (entries.get(i) == null) {
-                        System.out.println("");
-                    } else {
-                        System.out.println(entries.get(i).toString());
-                    }
+            // prints log in the regular output
+            for (int i = 0; i < entries.size(); i++) {
+                if (entries.get(i) == null) {
+                    System.out.println("");
+                } else {
+                    System.out.println(entries.get(i).toString());
                 }
-                
+            }
+
 //                try {
 //                    // creates the execution log file
 //                    FileWriter stream = new FileWriter(decodedPath + type);
@@ -76,7 +77,7 @@ public class ExecutionLog {
 //                        }
 //                    }
 //                }
-            }
+        }
 //        } catch (UnsupportedEncodingException ex) {
 //            Logger.getLogger(ExecutionLog.class.getName()).log(Level.WARNING, "Impossible to get path to save log", ex.getMessage());
 //

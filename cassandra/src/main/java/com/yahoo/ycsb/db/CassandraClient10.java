@@ -26,8 +26,6 @@ import java.util.Properties;
 import java.util.Random;
 import java.util.Set;
 import java.util.Vector;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import org.apache.cassandra.thrift.*;
 import org.apache.thrift.protocol.TBinaryProtocol;
 import org.apache.thrift.protocol.TProtocol;
@@ -68,7 +66,7 @@ public class CassandraClient10 extends DB {
     Cassandra.Client client;
     boolean _debug = false;
     String _table = "";
-    String host = null;
+    private String host = "";
     Exception errorexception = null;
     List<Mutation> mutations = new ArrayList<Mutation>();
     Map<String, List<Mutation>> mutationMap = new HashMap<String, List<Mutation>>();
@@ -89,8 +87,10 @@ public class CassandraClient10 extends DB {
         if (getProperties().getProperty("hosts") == null) {
             throw new DBException("Required property \"hosts\" missing for CassandraClient");
         }
-
-        assignRandomHost();
+        
+        // hosts must be reloaded every time a connection is created because some host host
+        // may be added (or removed) at any time
+        host = assignRandomHost(true);
 
         column_family = getProperties().getProperty(COLUMN_FAMILY_PROPERTY, COLUMN_FAMILY_PROPERTY_DEFAULT);
         parent = new ColumnParent(column_family);
@@ -107,7 +107,6 @@ public class CassandraClient10 extends DB {
         writeConsistencyLevel = ConsistencyLevel.valueOf(getProperties().getProperty(WRITE_CONSISTENCY_LEVEL_PROPERTY, WRITE_CONSISTENCY_LEVEL_PROPERTY_DEFAULT));
         scanConsistencyLevel = ConsistencyLevel.valueOf(getProperties().getProperty(SCAN_CONSISTENCY_LEVEL_PROPERTY, SCAN_CONSISTENCY_LEVEL_PROPERTY_DEFAULT));
         deleteConsistencyLevel = ConsistencyLevel.valueOf(getProperties().getProperty(DELETE_CONSISTENCY_LEVEL_PROPERTY, DELETE_CONSISTENCY_LEVEL_PROPERTY_DEFAULT));
-
 
         _debug = Boolean.parseBoolean(getProperties().getProperty("debug", "false"));
 
@@ -128,7 +127,7 @@ public class CassandraClient10 extends DB {
                 connectexception = e;
             }
             try {
-                Thread.sleep(100);
+                Thread.sleep(1000);
             } catch (InterruptedException e) {
             }
 
@@ -136,9 +135,9 @@ public class CassandraClient10 extends DB {
             // in up to 10 attempts
             if (retry % 5 == 4) {
                 if (_debug) {
-                    System.out.println("Retesting init after trying with " + host);
+                    System.out.println("Rerunning init after trying with " + host);
                 }
-                assignRandomHost();
+                host = assignRandomHost();
             }
         }
         if (connectexception != null) {
@@ -160,16 +159,16 @@ public class CassandraClient10 extends DB {
         }
     }
 
-    public void assignRandomHost() {
-        reloadHosts();
+    public String assignRandomHost() {
+        return assignRandomHost(false);
+    }
+
+    public String assignRandomHost(boolean initial) {
+        if (!initial) {
+            reloadHosts();
+        }
 
         String hosts = getProperties().getProperty("hosts");
-        if (hosts == null) {
-            // TODO: find a way to throw an exception even when this is called from
-            // other methods different of init()
-            return;
-            // throw new DBException("Required property \"hosts\" missing for CassandraClient");
-        }
 
         String[] allhosts = hosts.split(",");
 
@@ -178,7 +177,7 @@ public class CassandraClient10 extends DB {
         }
 
         // if no host was set yet
-        if (host == null) {
+        if (initial) {
             host = allhosts[random.nextInt(allhosts.length)];
             if (_debug) {
                 System.out.println("Setting host for the new client: " + host);
@@ -197,11 +196,14 @@ public class CassandraClient10 extends DB {
                 }
             }
         }
+
+        return host;
     }
 
     public void connect() {
-        // sets the timeout for 1 second
-        tr = new TFramedTransport(new TSocket(host, 9160, 1000));
+        // sets the timeout for 1 second, but does not set a timeout since
+        // some queries (like scans) can reach the timeout
+        tr = new TFramedTransport(new TSocket(host, 9160));
         TProtocol proto = new TBinaryProtocol(tr);
         client = new Cassandra.Client(proto);
     }
@@ -289,7 +291,7 @@ public class CassandraClient10 extends DB {
             }
 
             try {
-                Thread.sleep(100);
+                Thread.sleep(500);
             } catch (InterruptedException e) {
             }
 
@@ -305,30 +307,24 @@ public class CassandraClient10 extends DB {
                     System.out.println("Failed on read query: " + key);
                 }
 
-                assignRandomHost();
-
-                Boolean connected = false;
+                host = assignRandomHost();
 
                 // tries to connect 3 times
                 for (int retry = 0; retry < 3; retry++) {
                     if (_debug) {
-                        System.out.println("Retesting read after trying with " + host);
+                        System.out.println("Rerunning read after trying with " + host);
                     }
 
                     connect();
 
                     try {
                         tr.open();
-                        connected = true;
                         break;
                     } catch (Exception e) {
-                        connected = false;
-                    }
-                    try {
-                        if (connected == false) {
-                            Thread.sleep(100);
+                        try {
+                            Thread.sleep(1000);
+                        } catch (InterruptedException ex) {
                         }
-                    } catch (InterruptedException e) {
                     }
                 }
             }
@@ -363,7 +359,7 @@ public class CassandraClient10 extends DB {
                 return Error;
             }
         }
-        
+
         for (int i = 0; i < OperationRetries; i++) {
 
             try {
@@ -417,6 +413,7 @@ public class CassandraClient10 extends DB {
                 return Ok;
             } catch (Exception e) {
                 System.out.println("SCAN - Exception on thread: " + Thread.currentThread().getId());
+                e.printStackTrace(System.out);
                 errorexception = e;
             }
             try {
@@ -433,28 +430,24 @@ public class CassandraClient10 extends DB {
                     System.out.println("Failed on scan query: " + startkey);
                 }
 
-                assignRandomHost();
-
-                connect();
-
-                Boolean connected = false;
+                host = assignRandomHost();
 
                 // tries to connect 3 times
                 for (int retry = 0; retry < 3; retry++) {
-                    System.out.println("Retesting scan after trying with " + host);
+                    if (_debug) {
+                        System.out.println("Rerunning scan after trying with " + host);
+                    }
+
                     connect();
+
                     try {
                         tr.open();
-                        connected = true;
                         break;
                     } catch (Exception e) {
-                        connected = false;
-                    }
-                    try {
-                        if (connected == false) {
+                        try {
                             Thread.sleep(1000);
+                        } catch (InterruptedException ex) {
                         }
-                    } catch (InterruptedException e) {
                     }
                 }
             }
@@ -553,28 +546,24 @@ public class CassandraClient10 extends DB {
                     System.out.println("Failed on insert query: " + key);
                 }
 
-                assignRandomHost();
-
-                connect();
-
-                Boolean connected = false;
+                host = assignRandomHost();
 
                 // tries to connect 3 times
                 for (int retry = 0; retry < 3; retry++) {
-                    System.out.println("Retesting insert after trying with " + host);
+                    if (_debug) {
+                        System.out.println("Rerunning insert after trying with " + host);
+                    }
+
                     connect();
+
                     try {
                         tr.open();
-                        connected = true;
                         break;
                     } catch (Exception e) {
-                        connected = false;
-                    }
-                    try {
-                        if (connected == false) {
+                        try {
                             Thread.sleep(1000);
+                        } catch (InterruptedException ex) {
                         }
-                    } catch (InterruptedException e) {
                     }
                 }
             }
@@ -634,30 +623,24 @@ public class CassandraClient10 extends DB {
                     System.out.println("Failed on delete query: " + key);
                 }
 
-                assignRandomHost();
-
-                connect();
-
-                Boolean connected = false;
+                host = assignRandomHost();
 
                 // tries to connect 3 times
                 for (int retry = 0; retry < 3; retry++) {
                     if (_debug) {
-                        System.out.println("Re-running delete after trying with " + host);
+                        System.out.println("Rerunning delete after trying with " + host);
                     }
+
                     connect();
+
                     try {
                         tr.open();
-                        connected = true;
                         break;
                     } catch (Exception e) {
-                        connected = false;
-                    }
-                    try {
-                        if (connected == false) {
+                        try {
                             Thread.sleep(1000);
+                        } catch (InterruptedException ex) {
                         }
-                    } catch (InterruptedException e) {
                     }
                 }
             }
@@ -750,18 +733,17 @@ public class CassandraClient10 extends DB {
      *
      * }
      */
-    
-    public void printHeap(){
-        int mb = 1024*1024;
-         
+    public void printHeap() {
+        int mb = 1024 * 1024;
+
         //Getting the runtime reference from system
         Runtime runtime = Runtime.getRuntime();
-         
+
         //Print used memory
         System.err.println("Memory: "
-           + (runtime.totalMemory() - runtime.freeMemory()) / mb
-           + ", " + runtime.freeMemory() / mb
-           + ", " + runtime.totalMemory() / mb
-           + ", " + runtime.maxMemory() / mb);
+                + (runtime.totalMemory() - runtime.freeMemory()) / mb
+                + ", " + runtime.freeMemory() / mb
+                + ", " + runtime.totalMemory() / mb
+                + ", " + runtime.maxMemory() / mb);
     }
 }

@@ -15,6 +15,10 @@ import com.yahoo.ycsb.measurements.Measurements;
 import java.util.ArrayList;
 import java.util.Random;
 import java.util.Timer;
+import java.util.Vector;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -24,28 +28,34 @@ import java.util.logging.Logger;
  */
 public class ClientManager {
 
-    public ArrayList<ClientThread> clients;
+    public Vector<ClientThread> clients;
     public Workload workload;
     public Distribution distribution;
-    public ArrayList<LogEntry> timelineHistory;
+    public Vector<LogEntry> timelineHistory;
     public String dbName;
     public int currentTimelineIndex = 0;
     public Timer timer;
+    public ScheduledExecutorService executor;
     // step size (in seconds) to be considered when interpolate
     // between two Entries defined by the user in the config file
     public static float INTERPOLATION_STEP = 1f;
 
     public ClientManager(Distribution distribution, Sla sla, Workload workload) {
-        this.clients = new ArrayList<ClientThread>();
+        this.clients = new Vector<ClientThread>();
         this.distribution = distribution;
         this.workload = workload;
-        this.timelineHistory = new ArrayList<LogEntry>();
+        this.timelineHistory = new Vector<LogEntry>();
         this.dbName = workload.properties.getProperty("db", "com.yahoo.ycsb.BasicDB");
     }
 
     public void init() {
         if (distribution.timeline.size() > 0) {
+            // gets the first value of the original timeline, i.e. before adding
+            // the zero entry
             int initialValue = distribution.timeline.get(0).value;
+
+            // adds a zero value in the timeline
+            this.distribution.timeline.add(0, new Entry(0f, 0));
 
             // duplicates the config timeline and depending on the distribution type
             // inserts intermediate values between each two defined entries
@@ -57,14 +67,9 @@ public class ClientManager {
 
                 Measurements.setWorkloadStartTime(workload.startTime);
 
-                // create first group of clients
-                add(distribution.timeline.get(0).value);
-
-                // creates the timer to varies the number of clients according
-                // to the timeline previously generated
-                timer = new Timer();
-                VariationTask task = new VariationTask(this);
-                timer.schedule(task, (long) (INTERPOLATION_STEP * 1000), (long) (INTERPOLATION_STEP * 1000));
+                // initialise the executor
+                executor = Executors.newSingleThreadScheduledExecutor();
+                executor.scheduleAtFixedRate(new VariationTask(this), 0, 1, TimeUnit.SECONDS);
             } else {
                 Logger.getLogger(ClientManager.class.getName()).log(Level.SEVERE, null, "Timeline entry must be greater than zero");
             }
@@ -79,8 +84,6 @@ public class ClientManager {
 
     public void add(int number) {
         if (number > 0) {
-            ClientThread client = null;
-            int total_active = 0;
             for (int i = 0; i < number; i++) {
 
                 // creates the connection before start the thread to measure only
@@ -93,11 +96,10 @@ public class ClientManager {
                     System.exit(0);
                 }
 
-                //client = new Client(config, workload);
-                client = new ClientThread(db, this.workload.dotransactions, workload, i, number, this.workload.properties, -1, -1);
+                ClientThread client = new ClientThread(db, this.workload.dotransactions, workload, i, number, this.workload.properties, -1, -1);
                 clients.add(client);
-                
-                total_active = 0;
+
+                int total_active = 0;
 
                 // gets the list of active clients
                 for (int j = 0; j < this.clients.size(); j++) {
@@ -105,7 +107,7 @@ public class ClientManager {
                         total_active++;
                     }
                 }
-                
+
                 try {
                     // starts the thread that will send the queries
                     client.start();
@@ -126,7 +128,7 @@ public class ClientManager {
 
     public void remove(int number) {
         if (number > 0) {
-            Random generator = null;
+            Random generator;
             ArrayList<Integer> active;
             for (int i = 0; i < number; i++) {
                 // selects a random client to be removed
@@ -140,7 +142,7 @@ public class ClientManager {
                         active.add(j);
                     }
                 }
-                
+
                 int index = generator.nextInt(active.size());
                 if (index > -1) {
                     this.clients.get(active.get(index)).setStopRequested(true);
@@ -165,7 +167,6 @@ public class ClientManager {
 
         Entry current;
         Entry next;
-        int steps = 0;
         int count = 0;
         // defines the step between each two points
         for (int i = 0; i < originalEntries.size(); i++) {
@@ -183,7 +184,7 @@ public class ClientManager {
                     count++;
 
                     // truncates the value if not integer
-                    steps = (int) ((next.time - current.time) / INTERPOLATION_STEP) - 1;
+                    int steps = (int) ((next.time - current.time) / INTERPOLATION_STEP) - 1;
 
                     Entry newItem;
                     // create the intermediate values according to the distribution type
