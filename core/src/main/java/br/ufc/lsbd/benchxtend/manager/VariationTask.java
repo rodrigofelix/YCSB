@@ -6,9 +6,13 @@ package br.ufc.lsbd.benchxtend.manager;
 
 //import br.ufc.lsbd.benchxtend.log.ExecutionLog;
 import br.ufc.lsbd.benchxtend.ExecutionLog;
+import br.ufc.lsbd.benchxtend.LogEntry;
 import com.yahoo.ycsb.Client;
 import com.yahoo.ycsb.ClientThread;
 import java.io.IOException;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 
 /**
  *
@@ -17,6 +21,7 @@ import java.io.IOException;
 public class VariationTask implements Runnable {
 
     public ClientManager manager;
+    DateFormat dateFormat = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
 
     public VariationTask(ClientManager manager) {
         this.manager = manager;
@@ -36,10 +41,26 @@ public class VariationTask implements Runnable {
                 manager.remove(current - goal);
             } else if (current < goal) {
                 manager.add(goal - current);
+            } else {
+                // in this case, there is no need to change the number of clients, but
+                // there must be logged the number of clients was kept the same
+                int total_active = 0;
+
+                // gets the list of active clients
+                for (int j = 0; j < manager.clients.size(); j++) {
+                    if (!manager.clients.get(j).isStopRequested()) {
+                        total_active++;
+                    }
+                }
+                
+                // adds a new entry in the history
+                manager.timelineHistory.add(new LogEntry(ClientManager.getIntervalFromBeginning(manager.workload.startTime), total_active));
             }
 
             if (current != goal) {
-                System.out.println("Changing clients from " + current + " to " + goal);
+                output("Changing clients from " + current + " to " + goal);
+            } else {
+                output("Keeping " + current + " clients");
             }
 
             manager.currentTimelineIndex++;
@@ -47,7 +68,7 @@ public class VariationTask implements Runnable {
             // gets the last number of clients
             int last = manager.distribution.timeline.get(manager.currentTimelineIndex).value;
 
-            System.out.println("Removing last " + last + " clients");
+            output("Removing last " + last + " clients");
 
             // removes all the clients
             manager.remove(last);
@@ -67,7 +88,7 @@ public class VariationTask implements Runnable {
             long endTime = System.nanoTime();
 
             System.out.println("-------------------------------");
-            System.out.println("Printing time, # of machines");
+            System.out.println("Printing time, # of clients");
 
             // ExecutionLog.persist(manager.workload.measurements, ExecutionLog.EXECUTION);
             // TODO: figure out why this must be called before exportMeasurements 
@@ -79,9 +100,14 @@ public class VariationTask implements Runnable {
             try {
                 Client.exportMeasurements(manager.workload.properties, 0, (endTime - manager.workload.startTime) / (1000 * 1000));
             } catch (IOException e) {
-                System.err.println("Could not export measurements, error: " + e.getMessage());
+                output("Could not export measurements, error: " + e.getMessage());
                 System.exit(-1);
             }
         }
+    }
+    
+    public void output(String value) {
+        Date date = new Date();
+        System.out.println(new StringBuilder("[").append(dateFormat.format(date)).append("]").append(" ").append(value));
     }
 }

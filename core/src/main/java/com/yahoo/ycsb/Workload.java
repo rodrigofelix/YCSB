@@ -37,7 +37,7 @@ public abstract class Workload {
 
     public static final String INSERT_START_PROPERTY = "insertstart";
     public static final String INSERT_START_PROPERTY_DEFAULT = "0";
-    public static int SLEEP_TIME_BETWEEN_QUERIES = 1000; // in milliseconds
+    public static long SLEEP_TIME_BETWEEN_QUERIES = 1000; // in milliseconds
     public long startTime; // time the workload started being executed
     public Properties properties; // holds default properties of YCSB, not including Benchxtend properties
     public boolean dotransactions = true;

@@ -17,7 +17,10 @@ package com.yahoo.ycsb.db;
 
 import com.yahoo.ycsb.*;
 import java.nio.ByteBuffer;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -26,6 +29,8 @@ import java.util.Properties;
 import java.util.Random;
 import java.util.Set;
 import java.util.Vector;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import org.apache.cassandra.thrift.*;
 import org.apache.thrift.protocol.TBinaryProtocol;
 import org.apache.thrift.protocol.TProtocol;
@@ -62,11 +67,14 @@ public class CassandraClient10 extends DB {
     public static final String SCAN_CONSISTENCY_LEVEL_PROPERTY_DEFAULT = "ONE";
     public static final String DELETE_CONSISTENCY_LEVEL_PROPERTY = "cassandra.deleteconsistencylevel";
     public static final String DELETE_CONSISTENCY_LEVEL_PROPERTY_DEFAULT = "ONE";
-    TTransport tr;
-    Cassandra.Client client;
+    public TTransport tr;
+    public Cassandra.Client client;
     boolean _debug = false;
     String _table = "";
-    private String host = "";
+    private String host = ""; // current host being used to send queries for this client
+    private String hosts = ""; // list of available hosts
+    DateFormat dateFormat = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
+    public int counter = 1;
     Exception errorexception = null;
     List<Mutation> mutations = new ArrayList<Mutation>();
     Map<String, List<Mutation>> mutationMap = new HashMap<String, List<Mutation>>();
@@ -87,10 +95,10 @@ public class CassandraClient10 extends DB {
         if (getProperties().getProperty("hosts") == null) {
             throw new DBException("Required property \"hosts\" missing for CassandraClient");
         }
-        
-        // hosts must be reloaded every time a connection is created because some host host
+
+        // hosts must be reloaded every time a connection is created because some host
         // may be added (or removed) at any time
-        host = assignRandomHost(true);
+        host = assignRandomHost();
 
         column_family = getProperties().getProperty(COLUMN_FAMILY_PROPERTY, COLUMN_FAMILY_PROPERTY_DEFAULT);
         parent = new ColumnParent(column_family);
@@ -114,7 +122,7 @@ public class CassandraClient10 extends DB {
 
         for (int retry = 0; retry < ConnectionRetries; retry++) {
             if (_debug) {
-                System.out.println("Attempt #" + (new Integer(retry)).toString() + " on host " + host);
+                output("Attempt #" + (new Integer(retry)).toString() + " on host " + host);
             }
 
             connect();
@@ -135,14 +143,13 @@ public class CassandraClient10 extends DB {
             // in up to 10 attempts
             if (retry % 5 == 4) {
                 if (_debug) {
-                    System.out.println("Rerunning init after trying with " + host);
+                    output("Rerunning init after trying with " + host);
                 }
                 host = assignRandomHost();
             }
         }
         if (connectexception != null) {
-            System.err.println("Unable to connect to " + host + " after " + ConnectionRetries
-                    + " tries");
+            output("Unable to connect to " + host + " after " + ConnectionRetries + " tries");
             throw new DBException(connectexception);
         }
 
@@ -159,28 +166,33 @@ public class CassandraClient10 extends DB {
         }
     }
 
-    public String assignRandomHost() {
-        return assignRandomHost(false);
+    public void output(String value) {
+        Date date = new Date();
+        System.out.println(new StringBuilder("[").append(dateFormat.format(date)).append("]").append(" ").append(value));
     }
 
-    public String assignRandomHost(boolean initial) {
-        if (!initial) {
+    public String assignRandomHost() {
+        return assignRandomHost(true);
+    }
+
+    public String assignRandomHost(boolean reload) {
+        if (reload) {
             reloadHosts();
         }
 
-        String hosts = getProperties().getProperty("hosts");
+        hosts = getProperties().getProperty("hosts");
 
         String[] allhosts = hosts.split(",");
 
         if (_debug) {
-            System.out.println("Hosts list: " + hosts);
+            output("Hosts list: " + hosts);
         }
 
         // if no host was set yet
-        if (initial) {
+        if ("".equals(host)) {
             host = allhosts[random.nextInt(allhosts.length)];
             if (_debug) {
-                System.out.println("Setting host for the new client: " + host);
+                output("Setting host for the new client: " + host);
             }
         } else {
             // if a host was already set, gets a different one if there is more than one
@@ -192,7 +204,7 @@ public class CassandraClient10 extends DB {
                     host = allhosts[index];
                 } while (host.equals(currentHost));
                 if (_debug) {
-                    System.out.println("Changing host from " + currentHost + " to " + host);
+                    output("Changing host from " + currentHost + " to " + host);
                 }
             }
         }
@@ -201,8 +213,7 @@ public class CassandraClient10 extends DB {
     }
 
     public void connect() {
-        // sets the timeout for 1 second, but does not set a timeout since
-        // some queries (like scans) can reach the timeout
+        // do not set a timeout since some queries (like scans) can reach the timeout
         tr = new TFramedTransport(new TSocket(host, 9160));
         TProtocol proto = new TBinaryProtocol(tr);
         client = new Cassandra.Client(proto);
@@ -216,6 +227,46 @@ public class CassandraClient10 extends DB {
         tr.close();
     }
 
+    public int changeConnection() {
+        return changeConnection(false);
+    }
+
+    public int changeConnection(boolean force) {
+        if (force || counter % 10 == 0) {
+            reloadHosts();
+            // change host only if the list of hosts has changed since last time
+            // or if forced (for instance, if a connection is throwing exceptions)
+            // if (force || !hosts.equals(getProperties().getProperty("hosts"))) {
+            host = assignRandomHost(false);
+
+            for (int retry = 0; retry < 3; retry++) {
+                try {
+                    cleanup();
+                } catch (DBException ex) {
+                    output("Cleanup Exception: " + ex.getMessage());
+                }
+
+                connect();
+
+                try {
+                    tr.open();
+                    _table = "";
+                    break;
+                } catch (Exception e) {
+                    if (retry == 2) {
+                        return Error;
+                    }
+                    host = assignRandomHost();
+                }
+            }
+            // }
+        }
+
+        counter++;
+
+        return Ok;
+    }
+
     /**
      * Read a record from the database. Each field/value pair from the result
      * will be stored in a HashMap.
@@ -227,21 +278,22 @@ public class CassandraClient10 extends DB {
      * @return Zero on success, a non-zero error code on error
      */
     public int read(String table, String key, Set<String> fields, HashMap<String, ByteIterator> result) {
+
+        if (changeConnection() == Error) {
+            return Error;
+        }
+
         if (!_table.equals(table)) {
             try {
                 client.set_keyspace(table);
                 _table = table;
             } catch (Exception e) {
-                e.printStackTrace();
                 e.printStackTrace(System.out);
                 return Error;
             }
         }
 
         for (int i = 0; i < OperationRetries; i++) {
-            if (_debug) {
-                System.out.println("Reading key " + key + " #" + (new Integer(i)).toString() + " on host " + host);
-            }
             try {
                 SlicePredicate predicate;
                 if (fields == null) {
@@ -259,7 +311,7 @@ public class CassandraClient10 extends DB {
                 List<ColumnOrSuperColumn> results = client.get_slice(ByteBuffer.wrap(key.getBytes("UTF-8")), parent, predicate, readConsistencyLevel);
 
                 if (_debug) {
-                    System.out.print("Reading key: " + key);
+                    output("Reading key: " + key);
                 }
 
                 Column column;
@@ -272,22 +324,16 @@ public class CassandraClient10 extends DB {
                     value = new ByteArrayByteIterator(column.value.array(), column.value.position() + column.value.arrayOffset(), column.value.remaining());
 
                     result.put(name, value);
-
-                    if (_debug) {
-                        System.out.print("(" + name + "=" + value + ")");
-                    }
                 }
 
                 if (_debug) {
-                    System.out.println();
-                    System.out.println("ConsistencyLevel=" + readConsistencyLevel.toString());
+                    output("ConsistencyLevel=" + readConsistencyLevel.toString());
                 }
 
                 return Ok;
             } catch (Exception e) {
-                System.out.println("READ - Exception on thread: " + Thread.currentThread().getId());
+                output("Read Exception (Thread: " + Thread.currentThread().getId() + "; Host: " + host + "): " + e.toString());
                 errorexception = e;
-                e.printStackTrace(System.out);
             }
 
             try {
@@ -295,41 +341,12 @@ public class CassandraClient10 extends DB {
             } catch (InterruptedException e) {
             }
 
-            if (_debug) {
-                System.out.println("Failed attempt " + i);
-            }
-
-            // TODO: somehow reuse this for all operations
-            // gets another host, if the selected one is not connecting
-            // in up to 10 attempts
-            if (i % 10 == 9) {
-                if (_debug) {
-                    System.out.println("Failed on read query: " + key);
-                }
-
-                host = assignRandomHost();
-
-                // tries to connect 3 times
-                for (int retry = 0; retry < 3; retry++) {
-                    if (_debug) {
-                        System.out.println("Rerunning read after trying with " + host);
-                    }
-
-                    connect();
-
-                    try {
-                        tr.open();
-                        break;
-                    } catch (Exception e) {
-                        try {
-                            Thread.sleep(1000);
-                        } catch (InterruptedException ex) {
-                        }
-                    }
-                }
+            // change connection if an exception has happened
+            if (changeConnection(true) == Error) {
+                return Error;
             }
         }
-        errorexception.printStackTrace();
+
         errorexception.printStackTrace(System.out);
         return Error;
 
@@ -349,12 +366,16 @@ public class CassandraClient10 extends DB {
      */
     public int scan(String table, String startkey, int recordcount, Set<String> fields,
             Vector<HashMap<String, ByteIterator>> result) {
+
+        if (changeConnection() == Error) {
+            return Error;
+        }
+
         if (!_table.equals(table)) {
             try {
                 client.set_keyspace(table);
                 _table = table;
             } catch (Exception e) {
-                e.printStackTrace();
                 e.printStackTrace(System.out);
                 return Error;
             }
@@ -381,7 +402,7 @@ public class CassandraClient10 extends DB {
                 List<KeySlice> results = client.get_range_slices(parent, predicate, kr, scanConsistencyLevel);
 
                 if (_debug) {
-                    System.out.println("Scanning startkey: " + startkey);
+                    output("Scanning startkey: " + startkey);
                 }
 
                 HashMap<String, ByteIterator> tuple;
@@ -397,23 +418,17 @@ public class CassandraClient10 extends DB {
                         value = new ByteArrayByteIterator(column.value.array(), column.value.position() + column.value.arrayOffset(), column.value.remaining());
 
                         tuple.put(name, value);
-
-                        if (_debug) {
-                            System.out.print("(" + name + "=" + value + ")");
-                        }
                     }
 
                     result.add(tuple);
                     if (_debug) {
-                        System.out.println();
-                        System.out.println("ConsistencyLevel=" + scanConsistencyLevel.toString());
+                        output("ConsistencyLevel=" + scanConsistencyLevel.toString());
                     }
                 }
 
                 return Ok;
             } catch (Exception e) {
-                System.out.println("SCAN - Exception on thread: " + Thread.currentThread().getId());
-                e.printStackTrace(System.out);
+                output("Scan Exception (Thread: " + Thread.currentThread().getId() + "; Host: " + host + "): " + e.toString());
                 errorexception = e;
             }
             try {
@@ -421,38 +436,12 @@ public class CassandraClient10 extends DB {
             } catch (InterruptedException e) {
             }
 
-
-            // TODO: somehow reuse this for all operations
-            // gets another host, if the selected one is not connecting
-            // in up to 10 attempts
-            if (i % 10 == 9) {
-                if (_debug) {
-                    System.out.println("Failed on scan query: " + startkey);
-                }
-
-                host = assignRandomHost();
-
-                // tries to connect 3 times
-                for (int retry = 0; retry < 3; retry++) {
-                    if (_debug) {
-                        System.out.println("Rerunning scan after trying with " + host);
-                    }
-
-                    connect();
-
-                    try {
-                        tr.open();
-                        break;
-                    } catch (Exception e) {
-                        try {
-                            Thread.sleep(1000);
-                        } catch (InterruptedException ex) {
-                        }
-                    }
-                }
+            // change connection if an exception has happened
+            if (changeConnection(true) == Error) {
+                return Error;
             }
         }
-        errorexception.printStackTrace();
+
         errorexception.printStackTrace(System.out);
         return Error;
     }
@@ -482,12 +471,16 @@ public class CassandraClient10 extends DB {
      * @return Zero on success, a non-zero error code on error
      */
     public int insert(String table, String key, HashMap<String, ByteIterator> values) {
+
+        if (changeConnection() == Error) {
+            return Error;
+        }
+
         if (!_table.equals(table)) {
             try {
                 client.set_keyspace(table);
                 _table = table;
             } catch (Exception e) {
-                e.printStackTrace();
                 e.printStackTrace(System.out);
                 return Error;
             }
@@ -495,7 +488,7 @@ public class CassandraClient10 extends DB {
 
         for (int i = 0; i < OperationRetries; i++) {
             if (_debug) {
-                System.out.println("Inserting key: " + key);
+                output("Inserting key: " + key);
             }
 
             try {
@@ -525,12 +518,12 @@ public class CassandraClient10 extends DB {
                 record.clear();
 
                 if (_debug) {
-                    System.out.println("ConsistencyLevel=" + writeConsistencyLevel.toString());
+                    output("ConsistencyLevel=" + writeConsistencyLevel.toString());
                 }
 
                 return Ok;
             } catch (Exception e) {
-                System.out.println("INSERT - Exception on thread: " + Thread.currentThread().getId());
+                output("Insert Exception (Thread: " + Thread.currentThread().getId() + "; Host: " + host + "): " + e.toString());
                 errorexception = e;
             }
             try {
@@ -538,38 +531,12 @@ public class CassandraClient10 extends DB {
             } catch (InterruptedException e) {
             }
 
-            // TODO: somehow reuse this for all operations
-            // gets another host, if the selected one is not connecting
-            // in up to 10 attempts
-            if (i % 10 == 9) {
-                if (_debug) {
-                    System.out.println("Failed on insert query: " + key);
-                }
-
-                host = assignRandomHost();
-
-                // tries to connect 3 times
-                for (int retry = 0; retry < 3; retry++) {
-                    if (_debug) {
-                        System.out.println("Rerunning insert after trying with " + host);
-                    }
-
-                    connect();
-
-                    try {
-                        tr.open();
-                        break;
-                    } catch (Exception e) {
-                        try {
-                            Thread.sleep(1000);
-                        } catch (InterruptedException ex) {
-                        }
-                    }
-                }
+            // change connection if an exception has happened
+            if (changeConnection(true) == Error) {
+                return Error;
             }
         }
 
-        errorexception.printStackTrace();
         errorexception.printStackTrace(System.out);
         return Error;
     }
@@ -582,12 +549,16 @@ public class CassandraClient10 extends DB {
      * @return Zero on success, a non-zero error code on error
      */
     public int delete(String table, String key) {
+
+        if (changeConnection() == Error) {
+            return Error;
+        }
+
         if (!_table.equals(table)) {
             try {
                 client.set_keyspace(table);
                 _table = table;
             } catch (Exception e) {
-                e.printStackTrace();
                 e.printStackTrace(System.out);
                 return Error;
             }
@@ -601,13 +572,13 @@ public class CassandraClient10 extends DB {
                         deleteConsistencyLevel);
 
                 if (_debug) {
-                    System.out.println("Delete key: " + key);
-                    System.out.println("ConsistencyLevel=" + deleteConsistencyLevel.toString());
+                    output("Delete key: " + key);
+                    output("ConsistencyLevel=" + deleteConsistencyLevel.toString());
                 }
 
                 return Ok;
             } catch (Exception e) {
-                System.out.println("DELETE - Exception on thread: " + Thread.currentThread().getId());
+                output("Delete Exception (Thread: " + Thread.currentThread().getId() + "; Host: " + host + "): " + e.toString());
                 errorexception = e;
             }
             try {
@@ -615,37 +586,12 @@ public class CassandraClient10 extends DB {
             } catch (InterruptedException e) {
             }
 
-            // TODO: somehow reuse this for all operations
-            // gets another host, if the selected one is not connecting
-            // in up to 10 attempts
-            if (i % 10 == 9) {
-                if (_debug) {
-                    System.out.println("Failed on delete query: " + key);
-                }
-
-                host = assignRandomHost();
-
-                // tries to connect 3 times
-                for (int retry = 0; retry < 3; retry++) {
-                    if (_debug) {
-                        System.out.println("Rerunning delete after trying with " + host);
-                    }
-
-                    connect();
-
-                    try {
-                        tr.open();
-                        break;
-                    } catch (Exception e) {
-                        try {
-                            Thread.sleep(1000);
-                        } catch (InterruptedException ex) {
-                        }
-                    }
-                }
+            // change connection if an exception has happened
+            if (changeConnection(true) == Error) {
+                return Error;
             }
         }
-        errorexception.printStackTrace();
+
         errorexception.printStackTrace(System.out);
         return Error;
     }

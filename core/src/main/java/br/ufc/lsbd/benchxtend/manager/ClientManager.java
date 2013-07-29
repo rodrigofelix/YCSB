@@ -71,10 +71,10 @@ public class ClientManager {
                 executor = Executors.newSingleThreadScheduledExecutor();
                 executor.scheduleAtFixedRate(new VariationTask(this), 0, 1, TimeUnit.SECONDS);
             } else {
-                Logger.getLogger(ClientManager.class.getName()).log(Level.SEVERE, null, "Timeline entry must be greater than zero");
+                Logger.getLogger(ClientManager.class.getName()).log(Level.SEVERE, "Timeline entry must be greater than zero");
             }
         } else {
-            Logger.getLogger(ClientManager.class.getName()).log(Level.SEVERE, null, "At least one entry must be defined in the timeline");
+            Logger.getLogger(ClientManager.class.getName()).log(Level.SEVERE, "At least one entry must be defined in the timeline");
         }
     }
 
@@ -114,10 +114,10 @@ public class ClientManager {
                     // adds a new entry in the history
                     timelineHistory.add(new LogEntry(getIntervalFromBeginning(), total_active));
                 } catch (Exception ex) {
-                    Logger.getLogger(ClientManager.class.getName()).log(Level.WARNING, null, "Error when executing a client");
+                    Logger.getLogger(ClientManager.class.getName()).log(Level.WARNING, "Error when executing a client");
                 }
 
-                Logger.getLogger(ClientManager.class.getName()).log(Level.FINE, null, "Created client");
+                Logger.getLogger(ClientManager.class.getName()).log(Level.FINE, "Created client");
             }
         }
     }
@@ -156,6 +156,10 @@ public class ClientManager {
     public long getIntervalFromBeginning() {
         return (long) ((System.nanoTime() - this.workload.startTime) / 1000);
     }
+    
+    public static long getIntervalFromBeginning(long startTime) {
+        return (long) ((System.nanoTime() - startTime) / 1000);
+    }
 
     public void generateTimeline() {
         ArrayList<Entry> originalEntries = new ArrayList<Entry>();
@@ -178,7 +182,7 @@ public class ClientManager {
 
                 // calculates the number of steps
                 if (current.time > next.time) {
-                    Logger.getLogger(ClientManager.class.getName()).log(Level.SEVERE, null, "Entries in the timeline must have ascending time values");
+                    Logger.getLogger(ClientManager.class.getName()).log(Level.SEVERE, "Entries in the timeline must have ascending time values");
                 } else {
                     // increments the count to insert new items in the correct position
                     count++;

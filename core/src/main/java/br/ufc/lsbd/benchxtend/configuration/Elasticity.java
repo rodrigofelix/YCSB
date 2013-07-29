@@ -19,4 +19,8 @@ public class Elasticity {
     
     public float overprovisionLambda;
     
+    public float overprovPercentile;
+    
+    public float underprovPercentile;
+    
 }

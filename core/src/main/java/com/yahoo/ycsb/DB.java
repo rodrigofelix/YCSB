@@ -92,7 +92,7 @@ public abstract class DB {
             stream = new FileInputStream(propfile);
             myfileprops.load(stream);
             stream.close();
-            setProperties(myfileprops);
+            getProperties().setProperty("hosts", myfileprops.getProperty("hosts"));
         } catch (IOException e) {
             e.printStackTrace(System.out);
         }

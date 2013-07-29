@@ -10,8 +10,12 @@ import com.yahoo.ycsb.measurements.exporter.MeasurementsExporter;
 import java.io.IOException;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Properties;
+import java.util.Vector;
 
 /**
  *
@@ -26,7 +30,7 @@ public class OneMeasurementIndividual extends OneMeasurement {
     long workloadStartTime;
     Distribution distribution;
     Sla sla;
-    ArrayList<long[]> responseTimes;
+    Vector<long[]> responseTimes;
     private HashMap<Integer, int[]> returncodes;
 
     public OneMeasurementIndividual(String name, Properties props, Sla sla, Distribution distribution, long workloadStartTime) {
@@ -37,7 +41,7 @@ public class OneMeasurementIndividual extends OneMeasurement {
         totallatency = 0;
         min = -1;
         max = -1;
-        responseTimes = new ArrayList<long[]>();
+        responseTimes = new Vector<long[]>();
         returncodes = new HashMap<Integer, int[]>();
     }
 
@@ -102,8 +106,14 @@ public class OneMeasurementIndividual extends OneMeasurement {
         exporter.write(getName(), "Total Queries: ", count);
         exporter.write(getName(), "Total Latency: ", totallatency);
         exporter.write(getName(), "Average Latency (us): ", d.format(totallatency / count));
-        exporter.write(getName(), "Min Latency (us): ", d.format(min / count));
-        exporter.write(getName(), "Max Latency (us): ", d.format(max / count));
+        exporter.write(getName(), "Min Latency (us): ", d.format(min));
+        exporter.write(getName(), "Max Latency (us): ", d.format(max));
+
+        // shows the number of successful (0) and failed (-1) queries by operation type
+        for (Integer I : returncodes.keySet()) {
+            int[] val = returncodes.get(I);
+            exporter.write(getName(), "Return=" + I, val[0]);
+        }
 
         ArrayList<Float> underprovSet = new ArrayList<Float>();
         ArrayList<Float> overprovSet = new ArrayList<Float>();
@@ -112,19 +122,11 @@ public class OneMeasurementIndividual extends OneMeasurement {
         for (int i = 0; i < responseTimes.size(); i++) {
             // TODO: figure out why responseTimes.get(i) can be null
             if (responseTimes.get(i) != null) {
-                exporter.write(getName(), "Query", responseTimes.get(i)[0] + ", " + responseTimes.get(i)[1]);
-
-                if (responseTimes.get(i)[0] > expectedTime) {
-                    // calculates the rate violated / expected in an underprovisioning scenario
-                    underprovSet.add((float) responseTimes.get(i)[0] / expectedTime);
-                } else if (responseTimes.get(i)[0] < expectedTime - (distribution.elasticity.overprovisionLambda * expectedTime)) {
-                    // calculates the rate expected / violated in an overprovisioning scenario
-                    overprovSet.add((float) expectedTime / responseTimes.get(i)[0]);
-                }
+                exporter.write(getName(), "Query", responseTimes.get(i)[1] + ", " + responseTimes.get(i)[0]);
             }
         }
 
-        int current_second = 1;
+        long current_second = 1;
         int avg_counter = 0;
         long sum = 0;
         long latency;
@@ -137,7 +139,7 @@ public class OneMeasurementIndividual extends OneMeasurement {
                 time = responseTimes.get(i)[1];
                 latency = responseTimes.get(i)[0];
                 if ((time / 1000000f) > current_second) {
-                    exporter.write(getName(), "Average", (current_second * 1000000) + ", " + ((avg_counter > 0) ? (sum / avg_counter) : 0));
+                    exporter.write(getName(), "Average", current_second + "000000, " + ((avg_counter > 0) ? (sum / avg_counter) : 0));
 
                     sum = latency;
                     avg_counter = 1;
@@ -152,9 +154,38 @@ public class OneMeasurementIndividual extends OneMeasurement {
             }
         }
 
+        // sorts the vector to calculate the percentile
+        Collections.sort(responseTimes, new Comparator<long[]>() {
+            @Override
+            public int compare(long[] x, long[] y) {
+                return (new Long(x[0])).compareTo(y[0]);
+            }
+        });
+
+        // ensures the percentiles provided in the timeline.xml are valid
+        float configUnderPercentile = ((distribution.elasticity.underprovPercentile >= 1.0) ? 0.95f : distribution.elasticity.underprovPercentile);
+        float configOverPercentile = ((distribution.elasticity.overprovPercentile <= 0.0) ? 0.05f : distribution.elasticity.overprovPercentile);
+
+        long underprovPercentile = responseTimes.get((int) Math.ceil(responseTimes.size() * configUnderPercentile) - 1)[0];
+        long overprovPercentile = responseTimes.get((int) Math.ceil(responseTimes.size() * configOverPercentile) - 1)[0];
+
+        for (int i = 0; i < responseTimes.size(); i++) {
+            // TODO: figure out why responseTimes.get(i) can be null
+            if (responseTimes.get(i) != null) {
+                if (responseTimes.get(i)[0] > expectedTime && responseTimes.get(i)[0] < underprovPercentile) {
+                    // calculates the rate violated / expected in an underprovisioning scenario
+                    underprovSet.add((float) responseTimes.get(i)[0] / expectedTime);
+                } else if (responseTimes.get(i)[0] < expectedTime - (distribution.elasticity.overprovisionLambda * expectedTime) && responseTimes.get(i)[0] > overprovPercentile) {
+                    // calculates the rate expected / violated in an overprovisioning scenario
+                    overprovSet.add((float) expectedTime / responseTimes.get(i)[0]);
+                }
+            }
+        }
+
         float underprov = 0;
         float overprov = 0;
 
+        exporter.write(getName(), ((int)(configUnderPercentile * 100)) + "th Percentile: ", underprovPercentile);
         if (underprovSet.size() > 0) {
             float total = 0f;
 
@@ -172,6 +203,7 @@ public class OneMeasurementIndividual extends OneMeasurement {
             exporter.write(getName(), "Total of underprov queries: ", 0);
         }
 
+        exporter.write(getName(), ((int)(configOverPercentile * 100)) + "th Percentile: ", overprovPercentile);
         if (overprovSet.size() > 0) {
             float total = 0f;
 
